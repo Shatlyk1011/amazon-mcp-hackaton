@@ -18,7 +18,7 @@ export function BudgetPanel({
     ["Packing + pets", budget.additional],
   ] as const;
   return (
-    <Card className="rounded-xl bg-white shadow-[0_1px_3px_rgba(41,40,39,0.08)] dark:bg-[#1b1938]">
+    <Card className="rounded-xl bg-white shadow-[0_1px_1px_rgba(0,0,0,0.04)] ring-[#ebebeb] dark:bg-[#171717] dark:ring-[#4d4d4d]">
       <CardHeader className="flex-row items-start justify-between">
         <div>
           <CardTitle>Budget pulse</CardTitle>
@@ -26,7 +26,7 @@ export function BudgetPanel({
             One-time costs · rent stays separate
           </p>
         </div>
-        <CircleDollarSign className="size-5 text-[#155555] dark:text-[#c9b4fa]" />
+        <CircleDollarSign className="size-5 text-[#0070f3]" />
       </CardHeader>
       <CardContent>
         <div className="flex items-end justify-between">
@@ -34,12 +34,12 @@ export function BudgetPanel({
             <div className="text-xs text-muted-foreground">
               RECOMMENDED ESTIMATE
             </div>
-            <div className="mt-1 text-4xl font-[540] tracking-[-0.04em]">
+            <div className="mt-1 text-4xl font-semibold tracking-[-0.04em]">
               {money(budget.recommended)}
             </div>
           </div>
           <div
-            className={`text-right text-sm font-semibold ${budget.remaining >= 0 ? "text-[#155555] dark:text-[#8be0b0]" : "text-[#b42318] dark:text-[#f97066]"}`}
+            className={`text-right text-sm font-semibold ${budget.remaining >= 0 ? "text-[#0070f3] dark:text-[#50e3c2]" : "text-[#ee0000]"}`}
           >
             {budget.remaining >= 0
               ? `${money(budget.remaining)} left`

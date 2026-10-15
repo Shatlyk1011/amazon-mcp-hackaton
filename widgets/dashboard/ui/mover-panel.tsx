@@ -18,7 +18,7 @@ export function MoverPanel({
   onSelect: (id: string) => void;
 }) {
   return (
-    <Card className="mt-5 rounded-xl bg-white shadow-[0_1px_3px_rgba(41,40,39,0.08)] dark:bg-[#1b1938]">
+    <Card className="mt-5 rounded-xl bg-white shadow-[0_1px_1px_rgba(0,0,0,0.04)] ring-[#ebebeb] dark:bg-[#171717] dark:ring-[#4d4d4d]">
       <CardHeader className="flex-row items-start justify-between">
         <div>
           <CardTitle>Moving services</CardTitle>
@@ -26,21 +26,21 @@ export function MoverPanel({
             Estimates from demo adapters · request a quote for live pricing
           </CardDescription>
         </div>
-        <Truck className="size-5 text-[#155555] dark:text-[#c9b4fa]" />
+        <Truck className="size-5 text-[#0070f3]" />
       </CardHeader>
       <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {movers.map((item) => (
           <button
             key={item.id}
             onClick={() => onSelect(item.id)}
-            className={`rounded-lg border p-4 text-left transition ${selected === item.id ? "border-[#155555] bg-[#f4f8f6] dark:border-[#c9b4fa] dark:bg-[#2a2750]" : "border-border hover:border-[#1b1938]/40 dark:hover:border-white/40"}`}
+            className={`rounded-lg border p-4 text-left transition ${selected === item.id ? "border-[#0070f3] bg-[#d3e5ff]/35 dark:border-[#50e3c2] dark:bg-white/5" : "border-border hover:border-[#171717]/40 dark:hover:border-white/40"}`}
           >
             <div className="flex items-start justify-between">
-              <div className="grid size-9 place-items-center rounded-lg bg-[#f5f3ef] text-[#155555] dark:bg-[#252241] dark:text-[#c9b4fa]">
+              <div className="grid size-9 place-items-center rounded-md bg-[#f2f2f2] text-[#0070f3] dark:bg-white/10 dark:text-[#50e3c2]">
                 <Truck className="size-4" />
               </div>
               {selected === item.id && (
-                <Check className="size-4 text-[#155555] dark:text-[#c9b4fa]" />
+                <Check className="size-4 text-[#0070f3] dark:text-[#50e3c2]" />
               )}
             </div>
             <div className="mt-4 text-sm font-semibold">{item.name}</div>

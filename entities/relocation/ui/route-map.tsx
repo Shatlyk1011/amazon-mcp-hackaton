@@ -175,20 +175,20 @@ export function RouteMap({ route }: RouteMapProps) {
           source: "moveflow-route",
           layout: { "line-cap": "round", "line-join": "round" },
           paint: {
-            "line-color": "#152b2b",
+            "line-color": "#0070f3",
             "line-width": 5,
             "line-opacity": 0.9,
           },
         });
         fitRoute(map);
         if (route.originCoordinates) {
-          const marker = new mapboxgl.Marker({ color: "#152b2b" })
+          const marker = new mapboxgl.Marker({ color: "#171717" })
             .setLngLat([
               route.originCoordinates.longitude,
               route.originCoordinates.latitude,
             ])
             .setPopup(
-              new mapboxgl.Popup({ className: "text-[#292827]" }).setText(
+              new mapboxgl.Popup({ className: "text-[#171717]" }).setText(
                 `Origin: ${route.origin}`,
               ),
             )
@@ -198,13 +198,13 @@ export function RouteMap({ route }: RouteMapProps) {
             .setAttribute("aria-label", `Origin: ${route.origin}`);
         }
         if (route.destinationCoordinates) {
-          const marker = new mapboxgl.Marker({ color: "#f9735b" })
+          const marker = new mapboxgl.Marker({ color: "#0070f3" })
             .setLngLat([
               route.destinationCoordinates.longitude,
               route.destinationCoordinates.latitude,
             ])
             .setPopup(
-              new mapboxgl.Popup({ className: "text-[#292827]" }).setText(
+              new mapboxgl.Popup({ className: "text-[#171717]" }).setText(
                 `Destination: ${route.destination}`,
               ),
             )
@@ -227,7 +227,7 @@ export function RouteMap({ route }: RouteMapProps) {
   }, [hasLiveGeometry, route, token]);
 
   return (
-    <Card className="gap-0 overflow-hidden rounded-xl bg-card py-0">
+    <Card className="gap-0 overflow-hidden rounded-xl bg-card py-0 ring-[#ebebeb] dark:ring-[#4d4d4d]">
       <CardHeader className="gap-3 px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
@@ -247,8 +247,8 @@ export function RouteMap({ route }: RouteMapProps) {
         </div>
         <dl className="grid gap-3 sm:grid-cols-2">
           {[
-            ["Origin", route?.origin, "bg-[#152b2b] dark:bg-[#b7d9d0]"],
-            ["Destination", route?.destination, "bg-[#f9735b]"],
+            ["Origin", route?.origin, "bg-[#171717] dark:bg-white"],
+            ["Destination", route?.destination, "bg-[#0070f3]"],
           ].map(([label, location, color]) => (
             <div key={label} className="min-w-0">
               <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -267,7 +267,7 @@ export function RouteMap({ route }: RouteMapProps) {
       </CardHeader>
       <CardContent className="px-0">
         {/* A definite viewport height lets Mapbox's relative host fill it. */}
-        <div className="relative h-[460px] w-full bg-[#dfe9e6] dark:bg-[#173638] sm:h-[520px]">
+        <div className="relative h-[460px] w-full bg-[#f2f2f2] dark:bg-[#4d4d4d] sm:h-[520px]">
           <div
             ref={mapContainer}
             className={hasLiveGeometry ? "relative z-10 size-full" : "hidden"}

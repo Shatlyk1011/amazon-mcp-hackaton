@@ -10,10 +10,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   const fontVariables = {
-    "--font-sans":
-      '"Inter", "SF Pro Display", ui-sans-serif, system-ui, sans-serif',
+    "--font-sans": '"Geist", Arial, sans-serif',
     "--font-geist-mono":
-      '"SFMono-Regular", "Roboto Mono", ui-monospace, monospace',
+      '"Geist Mono", "SFMono-Regular", ui-monospace, monospace',
   } as CSSProperties;
 
   return (
