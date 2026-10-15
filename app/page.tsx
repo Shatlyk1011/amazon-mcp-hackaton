@@ -3,12 +3,16 @@ import { useState } from "react";
 import { DashboardPage } from "@/widgets/dashboard/ui/dashboard-page";
 import { LandingPage } from "@/widgets/landing/ui/landing-page";
 import type { Trace } from "@/widgets/dashboard/ui/mcp-explorer";
-import type { RelocationInput } from "@/lib/relocation";
+import type { Housing, RelocationInput } from "@/lib/relocation";
 import type { RouteResult } from "@/lib/providers/mapbox";
 export default function Home() {
   const [input, setInput] = useState<RelocationInput | null>(null);
   const [traces, setTraces] = useState<Trace[]>([]);
   const [route, setRoute] = useState<RouteResult | null>(null);
+  const [housing, setHousing] = useState<Housing[]>([]);
+  const [housingBrowseUrl, setHousingBrowseUrl] = useState(
+    "https://www.zillow.com/",
+  );
   async function runPlan(nextInput: RelocationInput) {
     const response = await fetch("/api/agent", {
       method: "POST",
@@ -18,12 +22,16 @@ export default function Home() {
     const data = await response.json();
     setInput(nextInput);
     setRoute(data.route);
+    setHousing(data.housing ?? []);
+    setHousingBrowseUrl(data.housingBrowseUrl ?? "https://www.zillow.com/");
     setTraces(data.traces);
   }
   return input ? (
     <DashboardPage
       input={input}
       route={route}
+      housing={housing}
+      housingBrowseUrl={housingBrowseUrl}
       traces={traces}
       onSwitchScenario={runPlan}
     />

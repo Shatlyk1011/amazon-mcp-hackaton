@@ -37,7 +37,20 @@ export type Housing = {
   isDemoData: boolean;
   lat: number;
   lng: number;
+  source?: string;
+  city?: string;
+  state?: string;
+  fetchedAt?: string;
 };
+
+export function housingListingUrl(
+  listing: Pick<Housing, "address" | "title" | "city" | "state">,
+) {
+  const location = [listing.city, listing.state].filter(Boolean).join(", ");
+  const searchLocation = location || listing.address;
+  const searchQuery = listing.title.trim() || listing.address;
+  return `https://www.zillow.com/homes/for_rent/${encodeURIComponent(searchLocation)}/?searchQuery=${encodeURIComponent(searchQuery)}`;
+}
 
 export type Mover = {
   id: string;

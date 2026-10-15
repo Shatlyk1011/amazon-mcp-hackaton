@@ -4,11 +4,12 @@ import { z } from "zod";
 import {
   calculateBudget,
   calculateRoute,
-  housing,
+  housing as demoHousing,
   movers,
   recommendations,
   relocationInputSchema,
 } from "@/lib/relocation";
+import { searchHousing } from "@/lib/providers/rentcast";
 
 const handler = createMcpHandler((server) => {
   server.registerTool(
@@ -47,7 +48,7 @@ const handler = createMcpHandler((server) => {
     "search_housing",
     {
       description:
-        "Search normalized housing results with explicit demo/source labels.",
+        "Search live rental listings near a destination using RentCast. If the provider is unavailable, return an empty result with the reason instead of synthetic listings.",
       inputSchema: z.object({
         destination: z.string(),
         maxRent: z.number().optional(),
@@ -59,13 +60,7 @@ const handler = createMcpHandler((server) => {
       content: [
         {
           type: "text",
-          text: JSON.stringify(
-            housing.filter(
-              (h) =>
-                (!input.maxRent || h.monthlyRent <= input.maxRent) &&
-                (!input.bedrooms || h.bedrooms >= input.bedrooms),
-            ),
-          ),
+          text: JSON.stringify(await searchHousing(input)),
         },
       ],
     }),
@@ -110,7 +105,7 @@ const handler = createMcpHandler((server) => {
           text: JSON.stringify(
             calculateBudget(
               input,
-              housing.find((h) => h.id === input.housingId),
+              demoHousing.find((h) => h.id === input.housingId),
               movers.find((m) => m.id === input.moverId),
             ),
           ),
@@ -129,7 +124,7 @@ const handler = createMcpHandler((server) => {
       }),
     },
     async (input) => {
-      const selectedHousing = housing.find((h) => h.id === input.housingId);
+      const selectedHousing = demoHousing.find((h) => h.id === input.housingId);
       const selectedMover = movers.find((m) => m.id === input.moverId);
       return {
         content: [
