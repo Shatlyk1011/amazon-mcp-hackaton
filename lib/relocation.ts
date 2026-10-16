@@ -56,188 +56,15 @@ export type Mover = {
   id: string;
   name: string;
   service: string;
-  costMin: number;
-  costMax: number;
-  pricing: "Estimated pricing" | "Published starting price";
-  website: string;
+  address?: string;
+  phone?: string;
+  distanceMiles?: number;
+  rating?: number;
+  userRatingCount?: number;
+  website?: string;
+  googleMapsUrl?: string;
   isDemoData: boolean;
 };
-
-export const housing: Housing[] = [
-  {
-    id: "h1",
-    title: "Park Slope light-filled two bedroom",
-    address: "225 5th Ave, Brooklyn, NY",
-    monthlyRent: 3350,
-    bedrooms: 2,
-    bathrooms: 1,
-    image:
-      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=900&q=80",
-    availability: "Listed as available",
-    listingUrl: "https://www.zillow.com/",
-    isDemoData: true,
-    lat: 40.672,
-    lng: -73.977,
-  },
-  {
-    id: "h2",
-    title: "Astoria garden apartment",
-    address: "31-18 35th St, Queens, NY",
-    monthlyRent: 2900,
-    bedrooms: 2,
-    bathrooms: 1,
-    image:
-      "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80",
-    availability: "Listed as available",
-    listingUrl: "https://www.zillow.com/",
-    isDemoData: true,
-    lat: 40.756,
-    lng: -73.923,
-  },
-  {
-    id: "h3",
-    title: "Williamsburg loft",
-    address: "88 Berry St, Brooklyn, NY",
-    monthlyRent: 4100,
-    bedrooms: 2,
-    bathrooms: 2,
-    image:
-      "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=900&q=80",
-    availability: "Unknown",
-    listingUrl: "https://www.zillow.com/",
-    isDemoData: true,
-    lat: 40.716,
-    lng: -73.961,
-  },
-  {
-    id: "h4",
-    title: "Washington Heights one bedroom",
-    address: "655 W 178th St, New York, NY",
-    monthlyRent: 2400,
-    bedrooms: 1,
-    bathrooms: 1,
-    image:
-      "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=900&q=80",
-    availability: "Listed as available",
-    listingUrl: "https://www.zillow.com/",
-    isDemoData: true,
-    lat: 40.848,
-    lng: -73.936,
-  },
-  {
-    id: "h5",
-    title: "Carroll Gardens brownstone",
-    address: "142 Sackett St, Brooklyn, NY",
-    monthlyRent: 3600,
-    bedrooms: 2,
-    bathrooms: 1,
-    image:
-      "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=900&q=80",
-    availability: "Unknown",
-    listingUrl: "https://www.zillow.com/",
-    isDemoData: true,
-    lat: 40.679,
-    lng: -73.999,
-  },
-  {
-    id: "h6",
-    title: "Long Island City skyline home",
-    address: "44-72 11th St, Queens, NY",
-    monthlyRent: 3950,
-    bedrooms: 2,
-    bathrooms: 2,
-    image:
-      "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=900&q=80",
-    availability: "Listed as available",
-    listingUrl: "https://www.zillow.com/",
-    isDemoData: true,
-    lat: 40.747,
-    lng: -73.949,
-  },
-  {
-    id: "h7",
-    title: "Upper West Side classic",
-    address: "410 W 86th St, New York, NY",
-    monthlyRent: 4550,
-    bedrooms: 2,
-    bathrooms: 1,
-    image:
-      "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=900&q=80",
-    availability: "Unknown",
-    listingUrl: "https://www.zillow.com/",
-    isDemoData: true,
-    lat: 40.789,
-    lng: -73.976,
-  },
-  {
-    id: "h8",
-    title: "Bed-Stuy sunlit flat",
-    address: "617 Lafayette Ave, Brooklyn, NY",
-    monthlyRent: 3200,
-    bedrooms: 2,
-    bathrooms: 1,
-    image:
-      "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=900&q=80",
-    availability: "Listed as available",
-    listingUrl: "https://www.zillow.com/",
-    isDemoData: true,
-    lat: 40.689,
-    lng: -73.947,
-  },
-];
-
-export const movers: Mover[] = [
-  {
-    id: "m1",
-    name: "Harbor & Vine Moving",
-    service: "Full-service movers",
-    costMin: 2350,
-    costMax: 3200,
-    pricing: "Estimated pricing",
-    website: "https://www.moving.com/",
-    isDemoData: true,
-  },
-  {
-    id: "m2",
-    name: "U-Pack Relocation",
-    service: "Storage / container shipping",
-    costMin: 1700,
-    costMax: 2400,
-    pricing: "Published starting price",
-    website: "https://www.upack.com/",
-    isDemoData: true,
-  },
-  {
-    id: "m3",
-    name: "U-Haul 20' truck",
-    service: "Truck rental",
-    costMin: 980,
-    costMax: 1450,
-    pricing: "Estimated pricing",
-    website: "https://www.uhaul.com/",
-    isDemoData: true,
-  },
-  {
-    id: "m4",
-    name: "Neighborly Loaders",
-    service: "Moving labor",
-    costMin: 620,
-    costMax: 980,
-    pricing: "Estimated pricing",
-    website: "https://www.hireahelper.com/",
-    isDemoData: true,
-  },
-  {
-    id: "m5",
-    name: "PODS City Transfer",
-    service: "Storage / container shipping",
-    costMin: 2100,
-    costMax: 2900,
-    pricing: "Published starting price",
-    website: "https://www.pods.com/",
-    isDemoData: true,
-  },
-];
 
 export async function calculateRoute(
   input: Pick<RelocationInput, "origin" | "destination">,
@@ -295,7 +122,6 @@ export function recommendations(input: RelocationInput) {
 export function calculateBudget(
   input: RelocationInput,
   selectedHousing?: Housing,
-  selectedMover?: Mover,
 ) {
   const housingUpfront = selectedHousing
     ? selectedHousing.monthlyRent * 2 + 250
@@ -308,13 +134,11 @@ export function calculateBudget(
       : input.scenario === "family"
         ? 520
         : 180;
-  const moving = selectedMover
-    ? (selectedMover.costMin + selectedMover.costMax) / 2
-    : input.furniture
-      ? input.scenario === "family"
-        ? 1800
-        : 950
-      : 0;
+  const moving = input.furniture
+    ? input.scenario === "family"
+      ? 1800
+      : 950
+    : 0;
   const supplies = input.furniture
     ? input.scenario === "family"
       ? 420

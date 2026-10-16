@@ -3,11 +3,11 @@ import {
   calculateBudget,
   calculateRoute,
   demoFamily,
-  movers,
   recommendations,
   relocationInputSchema,
 } from "@/lib/relocation";
 import { searchHousing } from "@/lib/providers/rentcast";
+import { searchMovingServices } from "@/lib/providers/tomtom-search";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -22,7 +22,14 @@ export async function POST(request: Request) {
       petFriendly: input.petFriendly,
     }),
   ]);
+  const movingServicesResult = await searchMovingServices({
+    origin: input.origin,
+    destination: input.destination,
+    furniture: input.furniture,
+    originCoordinates: route.originCoordinates,
+  });
   const housing = housingResult.listings;
+  const movers = movingServicesResult.movers;
   const selectedHousing = housing.find((item) => item.id === body.housingId);
   const selectedMover = movers.find((item) => item.id === body.moverId);
   const now = Date.now();
@@ -50,8 +57,10 @@ export async function POST(request: Request) {
     {
       tool: "search_moving_services",
       status: "completed",
-      duration: 0,
+      duration: now - start,
       output: movers,
+      source: movingServicesResult.source,
+      dataStatus: movingServicesResult.status,
     },
     {
       tool: "recommend_moving_strategy",
@@ -63,7 +72,7 @@ export async function POST(request: Request) {
       tool: "calculate_budget",
       status: "completed",
       duration: 0,
-      output: calculateBudget(input, selectedHousing, selectedMover),
+      output: calculateBudget(input, selectedHousing),
     },
   ];
   return NextResponse.json({
@@ -72,11 +81,14 @@ export async function POST(request: Request) {
     housing,
     movers,
     recommendations: recommendations(input),
-    budget: calculateBudget(input, selectedHousing, selectedMover),
+    budget: calculateBudget(input, selectedHousing),
     housingSource: housingResult.source,
     housingStatus: housingResult.status,
     housingWarning: housingResult.warning,
     housingBrowseUrl: housingResult.browseUrl,
+    movingServicesSource: movingServicesResult.source,
+    movingServicesStatus: movingServicesResult.status,
+    movingServicesWarning: movingServicesResult.warning,
     traces,
     selectedHousingId: selectedHousing?.id ?? null,
     selectedMoverId: selectedMover?.id ?? null,

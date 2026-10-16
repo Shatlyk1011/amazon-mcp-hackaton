@@ -4,12 +4,12 @@ import { z } from "zod";
 import {
   calculateBudget,
   calculateRoute,
-  housing as demoHousing,
-  movers,
   recommendations,
   relocationInputSchema,
 } from "@/lib/relocation";
+import { DEMO_HOUSES as demoHousing } from "@/data";
 import { searchHousing } from "@/lib/providers/rentcast";
+import { searchMovingServices } from "@/lib/providers/tomtom-search";
 
 const handler = createMcpHandler((server) => {
   server.registerTool(
@@ -48,7 +48,7 @@ const handler = createMcpHandler((server) => {
     "search_housing",
     {
       description:
-        "Search live rental listings near a destination using RentCast. If the provider is unavailable, return an empty result with the reason instead of synthetic listings.",
+        "Search rental listings near a destination using RentCast, with the bundled development response as a local fallback.",
       inputSchema: z.object({
         destination: z.string(),
         maxRent: z.number().optional(),
@@ -68,14 +68,22 @@ const handler = createMcpHandler((server) => {
   server.registerTool(
     "search_moving_services",
     {
-      description: "Find moving providers and estimated pricing.",
+      description:
+        "Find real moving and relocation services near the origin using TomTom Search API. Results do not include quotes or destination-service guarantees.",
       inputSchema: z.object({
         origin: z.string(),
         destination: z.string(),
         furniture: z.boolean(),
       }),
     },
-    async () => ({ content: [{ type: "text", text: JSON.stringify(movers) }] }),
+    async (input) => ({
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(await searchMovingServices(input)),
+        },
+      ],
+    }),
   );
   server.registerTool(
     "recommend_moving_strategy",
@@ -106,7 +114,6 @@ const handler = createMcpHandler((server) => {
             calculateBudget(
               input,
               demoHousing.find((h) => h.id === input.housingId),
-              movers.find((m) => m.id === input.moverId),
             ),
           ),
         },
@@ -125,14 +132,13 @@ const handler = createMcpHandler((server) => {
     },
     async (input) => {
       const selectedHousing = demoHousing.find((h) => h.id === input.housingId);
-      const selectedMover = movers.find((m) => m.id === input.moverId);
       return {
         content: [
           {
             type: "text",
             text: JSON.stringify({
               selection: { housingId: input.housingId, moverId: input.moverId },
-              budget: calculateBudget(input, selectedHousing, selectedMover),
+              budget: calculateBudget(input, selectedHousing),
             }),
           },
         ],

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEMO_HOUSES } from "@/data";
 import { housingListingUrl, type Housing } from "@/lib/relocation";
 
 const rentCastListingSchema = z.record(z.string(), z.unknown());
@@ -98,13 +99,17 @@ export async function searchHousing(
 ): Promise<HousingSearchResult> {
   const fetchedAt = new Date().toISOString();
   const token = process.env.RENTCAST_API_KEY;
-  if (!token) {
+  const useDevelopmentData = process.env.NODE_ENV !== "production";
+  if (useDevelopmentData || !token) {
     return {
-      listings: [],
-      source: "RentCast",
+      listings: DEMO_HOUSES,
+      source: "RentCast · development response",
       status: "unavailable",
       fetchedAt,
-      warning: "RENTCAST_API_KEY is not configured",
+      warning:
+        useDevelopmentData
+          ? "Using the development response from data.ts"
+          : "RENTCAST_API_KEY is not configured; showing the development response from data.ts",
       browseUrl: browseUrl(input.destination),
     };
   }
