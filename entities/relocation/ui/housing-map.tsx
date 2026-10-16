@@ -149,6 +149,8 @@ export function HousingMap({
     };
   }, [mappableListings, onSelect, token]);
 
+  console.log('listings', listings)
+
   return (
     <Card className="gap-0 overflow-hidden rounded-xl bg-card py-0 ring-[#ebebeb] dark:ring-[#4d4d4d]">
       <CardHeader className="gap-3 px-4 py-3">

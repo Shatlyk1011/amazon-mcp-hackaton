@@ -228,7 +228,7 @@ export function RouteMap({ route }: RouteMapProps) {
 
   return (
     <Card className="gap-0 overflow-hidden rounded-xl bg-card py-0 ring-[#ebebeb] dark:ring-[#4d4d4d]">
-      <CardHeader className="gap-3 px-4 py-3">
+      <CardHeader className="gap-4 px-6 py-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
             <Route
@@ -303,7 +303,7 @@ export function RouteMap({ route }: RouteMapProps) {
           )}
         </div>
       </CardContent>
-      <CardFooter className="flex-col items-stretch gap-3 border-t px-4 py-3">
+      <CardFooter className="flex-col items-stretch gap-4 border-t px-6 py-6">
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div>
             <dt className="text-xs text-muted-foreground">Distance</dt>
