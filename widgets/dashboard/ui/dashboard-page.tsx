@@ -33,7 +33,7 @@ import { McpActivity, type Trace } from "@/widgets/dashboard/ui/mcp-explorer";
 import type { RouteResult } from "@/lib/providers/mapbox";
 import { MoveSetupSummary } from "./move-setup-summary";
 import { FlightSchedulesPanel } from "./flight-schedules-panel";
-import type { FlightScheduleResult } from "@/lib/providers/airlabs";
+import type { FlightScheduleResult } from "@/lib/providers/demo-flights";
 
 function ToolSource({ tool }: { tool: string }) {
   return (

@@ -5,7 +5,7 @@ import {
   type RelocationInput,
 } from "@/lib/relocation";
 import { searchHousing } from "@/lib/providers/rentcast";
-import { searchFlightConnections } from "@/lib/providers/airlabs";
+import { searchFlightConnections } from "@/lib/providers/demo-flights";
 import { searchMovingServices } from "@/lib/providers/tomtom-search";
 
 export async function generatePlan(
@@ -19,7 +19,7 @@ export async function generatePlan(
       ? searchHousing({
           destination: input.destination,
           maxRent: input.maxRent,
-          bedrooms: input.minBedrooms,
+          bedrooms: input.minBedrooms || undefined,
           petFriendly: input.petFriendly,
         })
       : Promise.resolve({

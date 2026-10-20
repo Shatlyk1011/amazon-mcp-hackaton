@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { FlightScheduleResult } from "@/lib/providers/airlabs";
+import type { FlightScheduleResult } from "@/lib/providers/demo-flights";
 
 export function FlightSchedulesPanel({
   schedules,
