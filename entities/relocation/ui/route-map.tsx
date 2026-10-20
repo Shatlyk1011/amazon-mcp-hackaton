@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { RouteResult } from "@/lib/providers/mapbox";
+import { MapInteractionGuard } from "./map-interaction-guard";
 
 type RouteMapProps = {
   route: RouteResult | null;
@@ -227,7 +228,7 @@ export function RouteMap({ route }: RouteMapProps) {
   }, [hasLiveGeometry, route, token]);
 
   return (
-    <Card className="gap-0 overflow-hidden rounded-xl bg-card py-0 ring-[#ebebeb] dark:ring-[#4d4d4d]">
+    <Card className="gap-0 overflow-hidden rounded-xl bg-card py-0 ring-[#ebebeb]">
       <CardHeader className="gap-4 px-6 py-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
@@ -247,7 +248,7 @@ export function RouteMap({ route }: RouteMapProps) {
         </div>
         <dl className="grid gap-3 sm:grid-cols-2">
           {[
-            ["Origin", route?.origin, "bg-[#171717] dark:bg-white"],
+            ["Origin", route?.origin, "bg-[#171717]"],
             ["Destination", route?.destination, "bg-[#0070f3]"],
           ].map(([label, location, color]) => (
             <div key={label} className="min-w-0">
@@ -267,11 +268,12 @@ export function RouteMap({ route }: RouteMapProps) {
       </CardHeader>
       <CardContent className="px-0">
         {/* A definite viewport height lets Mapbox's relative host fill it. */}
-        <div className="relative h-[460px] w-full bg-[#f2f2f2] dark:bg-[#4d4d4d] sm:h-[520px]">
-          <div
-            ref={mapContainer}
-            className={hasLiveGeometry ? "relative z-10 size-full" : "hidden"}
-          />
+        <div className="relative h-[460px] w-full bg-[#f2f2f2] sm:h-[520px]">
+          {hasLiveGeometry && (
+            <MapInteractionGuard>
+              <div ref={mapContainer} className="relative z-10 size-full" />
+            </MapInteractionGuard>
+          )}
           {staticMapUrl && (
             <img
               src={staticMapUrl}

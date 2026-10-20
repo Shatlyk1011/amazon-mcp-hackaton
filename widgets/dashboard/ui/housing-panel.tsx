@@ -93,7 +93,7 @@ export function HousingPanel({
   const averageBathrooms = average("bathrooms");
 
   return (
-    <Card className="rounded-xl bg-white shadow-[0_1px_1px_rgba(0,0,0,0.04)] ring-[#ebebeb] dark:bg-[#171717] dark:ring-[#4d4d4d]">
+    <Card className="rounded-xl bg-white shadow-[0_1px_1px_rgba(0,0,0,0.04)] ring-[#ebebeb]">
       <CardHeader className="flex-row flex-wrap items-start justify-between gap-4">
         <div>
           <CardTitle>Housing shortlist</CardTitle>
@@ -101,7 +101,7 @@ export function HousingPanel({
             {items[0]?.source ?? "Live"} listings · select a home to use it in
             your budget
           </CardDescription>
-          <div className="mt-4 grid grid-cols-3 gap-3 border-t border-[#ebebeb] pt-4 dark:border-[#4d4d4d]">
+          <div className="mt-4 grid grid-cols-3 gap-3 border-t border-[#ebebeb] pt-4">
             {[
               ["Avg. rent", averageRent ? money(Math.round(averageRent)) : "—"],
               ["Avg. beds", averageBedrooms ? averageBedrooms.toFixed(1) : "—"],
@@ -125,13 +125,13 @@ export function HousingPanel({
           href={browseUrl}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-xs font-medium text-[#0070f3] underline-offset-4 hover:bg-[#d3e5ff]/60 hover:underline dark:text-[#50e3c2] dark:hover:bg-white/10"
+          className="inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-xs font-medium text-[#0070f3] underline-offset-4 hover:bg-[#d3e5ff]/60 hover:underline"
         >
           Search Zillow <ArrowRight className="size-3" />
         </a>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
-        <div className="rounded-lg border border-[#ebebeb] bg-[#fafafa] p-3 dark:border-[#4d4d4d] dark:bg-white/[0.03]">
+        <div className="rounded-lg border border-[#ebebeb] bg-[#fafafa] p-3">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-sm font-medium">
               <SlidersHorizontal className="size-4 text-muted-foreground" />
@@ -207,7 +207,7 @@ export function HousingPanel({
               {visibleItems.map((item) => (
                 <div
                   key={item.id}
-                  className={`overflow-hidden rounded-lg border transition ${selected === item.id ? "border-[#0070f3] ring-2 ring-[#d3e5ff] dark:border-[#50e3c2] dark:ring-[#50e3c2]/20" : "border-border hover:border-[#171717]/40 dark:hover:border-white/40"}`}
+                  className={`overflow-hidden rounded-lg border transition ${selected === item.id ? "border-[#0070f3] ring-2 ring-[#d3e5ff]" : "border-border hover:border-[#171717]/40"}`}
                 >
                   <button
                     type="button"
@@ -227,7 +227,7 @@ export function HousingPanel({
                           {item.title}
                         </div>
                         {selected === item.id && (
-                          <Check className="size-4 shrink-0 text-[#0070f3] dark:text-[#50e3c2]" />
+                          <Check className="size-4 shrink-0 text-[#0070f3]" />
                         )}
                       </div>
                       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -250,7 +250,7 @@ export function HousingPanel({
                     href={housingListingUrl(item)}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-1 border-t border-[#ebebeb] px-3 py-2 text-xs font-medium text-[#0070f3] hover:bg-[#d3e5ff]/40 dark:border-[#4d4d4d] dark:text-[#50e3c2] dark:hover:bg-white/10"
+                    className="flex items-center gap-1 border-t border-[#ebebeb] px-3 py-2 text-xs font-medium text-[#0070f3] hover:bg-[#d3e5ff]/40"
                   >
                     View listing <ExternalLink className="size-3" />
                   </a>
@@ -258,7 +258,7 @@ export function HousingPanel({
               ))}
             </div>
             {visibleCount < items.length && (
-              <div className="flex justify-center border-t border-[#ebebeb] pt-4 dark:border-[#4d4d4d]">
+              <div className="flex justify-center border-t border-[#ebebeb] pt-4">
                 <Button
                   type="button"
                   variant="outline"

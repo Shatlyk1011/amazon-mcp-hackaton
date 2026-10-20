@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { rememberPlan } from "@/features/plan-history/storage";
+import { PlanHistory } from "@/features/plan-history/plan-history";
 import { LandingPage } from "@/widgets/landing/ui/landing-page";
 import { MoveContext } from "@/features/move-intake/ui/move-context";
 import { MoveIntake } from "@/features/move-intake/ui/move-intake";
@@ -55,8 +57,10 @@ export default function Home() {
         }
         throw new Error(data.error || "Could not continue your move setup.");
       }
-      if (data.plan) router.push(`/dashboard/${data.plan.id}`);
-      else if (data.intake) {
+      if (data.plan) {
+        rememberPlan(data.plan.id);
+        router.push(`/dashboard/${data.plan.id}`);
+      } else if (data.intake) {
         setIntake(data.intake);
         setResumable(undefined);
       }
@@ -138,17 +142,20 @@ export default function Home() {
         </>
       }
       resumeControl={
-        resumable ? (
-          <Button
-            variant="outline"
-            onClick={() => {
-              setIntake(resumable);
-              setError(undefined);
-            }}
-          >
-            Continue your saved move setup
-          </Button>
-        ) : null
+        <>
+          {resumable ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIntake(resumable);
+                setError(undefined);
+              }}
+            >
+              Continue your saved move setup
+            </Button>
+          ) : null}
+          <PlanHistory />
+        </>
       }
     />
   );

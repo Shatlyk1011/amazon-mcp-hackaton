@@ -6,10 +6,8 @@ import {
   ChevronDown,
   CircleDollarSign,
   Clock3,
-  Moon,
   Route,
   Sparkles,
-  Sun,
   Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -37,10 +35,10 @@ import type { FlightScheduleResult } from "@/lib/providers/demo-flights";
 
 function ToolSource({ tool }: { tool: string }) {
   return (
-    <div className="flex items-center gap-2 font-mono text-xs font-medium text-[#4d4d4d] dark:text-[#a1a1a1]">
-      <span className="size-2 rounded-full bg-[#0070f3] dark:bg-[#50e3c2]" />
+    <div className="flex items-center gap-2 font-mono text-xs font-medium text-[#4d4d4d]">
+      <span className="size-2 rounded-full bg-[#0070f3]" />
       MCP TOOL
-      <code className="rounded bg-[#f2f2f2] px-1.5 py-0.5 text-[#171717] dark:bg-white/10 dark:text-white">
+      <code className="rounded bg-[#f2f2f2] px-1.5 py-0.5 text-[#171717]">
         {tool}
       </code>
     </div>
@@ -88,24 +86,6 @@ export function DashboardPage({
   });
   const [appliedHousingFilters, setAppliedHousingFilters] =
     useState<HousingFilters>(housingFilters);
-  const [isDark, setIsDark] = useState(false);
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      const stored = window.localStorage.getItem("moveflow-theme");
-      const next = stored
-        ? stored === "dark"
-        : window.matchMedia("(prefers-color-scheme: dark)").matches;
-      setIsDark(next);
-      document.documentElement.classList.toggle("dark", next);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, []);
-  function toggleTheme() {
-    const next = !isDark;
-    setIsDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    window.localStorage.setItem("moveflow-theme", next ? "dark" : "light");
-  }
   useEffect(() => {
     const timeout = window.setTimeout(
       () => setAppliedHousingFilters(housingFilters),
@@ -146,16 +126,16 @@ export function DashboardPage({
   return (
     <main className="min-h-screen bg-background text-foreground">
       <section className="min-w-0">
-        <header className="sticky top-0 z-20 mx-auto flex max-w-[1440px] items-center justify-between gap-4 border-b border-[#ebebeb] bg-[#fafafa]/90 px-5 py-4 backdrop-blur dark:border-[#4d4d4d] dark:bg-[#171717]/90 lg:px-8">
+        <header className="sticky top-0 z-20 mx-auto flex max-w-[1440px] items-center justify-between gap-4 border-b border-[#ebebeb] bg-[#fafafa]/90 px-5 py-4 backdrop-blur lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <Link
               href="/"
-              className="grid size-9 shrink-0 place-items-center rounded-md bg-[#171717] text-sm font-semibold text-white dark:bg-white dark:text-[#171717]"
+              className="grid size-9 shrink-0 place-items-center rounded-md bg-[#171717] text-sm font-semibold text-white"
             >
               M
             </Link>
             <div className="min-w-0">
-              <div className="font-mono text-[11px] font-medium tracking-normal text-[#4d4d4d] dark:text-[#a1a1a1]">
+              <div className="font-mono text-[11px] font-medium tracking-normal text-[#4d4d4d]">
                 MOVEFLOW · YOUR RELOCATION PLAN
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 text-base sm:text-lg font-semibold tracking-[-0.02em]">
@@ -164,19 +144,6 @@ export function DashboardPage({
                 {input.destination}
               </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label={
-                isDark ? "Switch to light mode" : "Switch to dark mode"
-              }
-              onClick={toggleTheme}
-              className="border-[#ebebeb] bg-white dark:border-[#4d4d4d] dark:bg-[#171717]"
-            >
-              {isDark ? <Sun /> : <Moon />}
-            </Button>
           </div>
         </header>
         <div className="mx-auto grid max-w-[1440px] items-start gap-8 px-5 py-8 sm:px-8 lg:grid-cols-[248px_minmax(0,1fr)] lg:py-10">
@@ -204,7 +171,7 @@ export function DashboardPage({
             </details>
           </aside>
           <div className="min-w-0">
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-[#ebebeb] bg-white p-6 text-[#171717] dark:border-[#4d4d4d] dark:bg-[#171717] dark:text-white">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-[#ebebeb] bg-white p-6 text-[#171717]">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-semibold leading-8 tracking-tight">
@@ -214,7 +181,7 @@ export function DashboardPage({
                     Plan ready
                   </Badge>
                 </div>
-                <p className="mt-2 text-sm leading-5 text-[#4d4d4d] dark:text-white/75">
+                <p className="mt-2 text-sm leading-5 text-[#4d4d4d]">
                   {input.scenario === "family" ? "Family move" : "Solo move"}
                   {input.pets > 0 &&
                     ` · ${input.pets} ${input.pets === 1 ? "pet" : "pets"}`}
@@ -257,15 +224,15 @@ export function DashboardPage({
                 <Card
                   key={label as string}
                   size="sm"
-                  className="gap-0 rounded-lg bg-white py-0 ring-[#ebebeb] dark:bg-[#171717] dark:ring-[#4d4d4d]"
+                  className="gap-0 rounded-lg bg-white py-0 ring-[#ebebeb]"
                 >
                   <CardContent className="flex items-center gap-3 px-4 py-5">
                     <Icon
                       aria-hidden="true"
-                      className="size-4 shrink-0 text-[#4d4d4d] dark:text-[#a1a1a1]"
+                      className="size-4 shrink-0 text-[#4d4d4d]"
                     />
                     <div className="min-w-0">
-                      <div className="text-xs leading-4 text-[#4d4d4d] dark:text-[#a1a1a1]">
+                      <div className="text-xs leading-4 text-[#4d4d4d]">
                         {label as string}
                       </div>
                       <div className="mt-1 text-xl font-semibold leading-7 tracking-tight tabular-nums">
@@ -308,49 +275,7 @@ export function DashboardPage({
                   />
                 </div>
               ) : null}
-              <div className="flex flex-col gap-4">
-                <Card className="rounded-xl bg-white shadow-[0_1px_1px_rgba(0,0,0,0.04)] ring-[#ebebeb] dark:bg-[#171717] dark:ring-[#4d4d4d]">
-                  <CardHeader className="flex-row items-start justify-between">
-                    <div>
-                      <div className="font-mono text-[11px] font-medium uppercase tracking-normal text-[#4d4d4d] dark:text-[#a1a1a1]">
-                        Suggested path
-                      </div>
-                      <CardTitle className="mt-2">
-                        {recs[1]?.label} · {recs[1]?.transport}
-                      </CardTitle>
-                    </div>
-                    <Sparkles className="size-5 text-[#0070f3]" />
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      {recs[1]?.explanation}
-                    </p>
-                    <div className="my-5 h-px bg-border" />
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <div className="text-xs text-muted-foreground">
-                          ESTIMATED MOVE COST
-                        </div>
-                        <div className="mt-1 text-3xl font-semibold">
-                          {money(recs[1]?.cost ?? 0)}
-                        </div>
-                      </div>
-                      <Badge
-                        variant={
-                          budget.remaining >= 0 ? "secondary" : "destructive"
-                        }
-                      >
-                        {budget.remaining >= 0
-                          ? "Within budget"
-                          : "Over budget"}
-                      </Badge>
-                    </div>
-                    <Button className="mt-6 w-full rounded-md bg-[#171717] text-white hover:bg-[#171717]/85 dark:bg-white dark:text-[#171717] dark:hover:bg-white/85">
-                      Use this strategy <ArrowRight data-icon="inline-end" />
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
+
             </div>
             <div className="mt-10 flex flex-col gap-4">
               <div>
@@ -366,7 +291,7 @@ export function DashboardPage({
                       key={recommendation.id}
                       className={
                         index === 1
-                          ? "border-[#0070f3] bg-[#d3e5ff]/35 ring-[#0070f3]/20 dark:border-[#50e3c2] dark:bg-[#171717]"
+                          ? "border-[#0070f3] bg-[#d3e5ff]/35 ring-[#0070f3]/20"
                           : undefined
                       }
                     >

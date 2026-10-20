@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowUp, ListChecks, LoaderCircle, Sparkles } from "lucide-react";
 import { DashboardPage } from "./dashboard-page";
@@ -27,6 +27,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { rememberPlan } from "@/features/plan-history/storage";
 import type { PlanRequest, SavedPlan } from "@/lib/plans/types";
 
 export function PlanWorkspace({
@@ -44,6 +45,10 @@ export function PlanWorkspace({
   const [isRefinementOpen, setRefinementOpen] = useState(false);
   const active = useRef(false);
   const messageAttempt = useRef<{ message: string; id: string } | null>(null);
+
+  useEffect(() => {
+    rememberPlan(initialPlan.id);
+  }, [initialPlan.id]);
 
   async function send(path: string, body: unknown, method = "POST") {
     if (active.current) return false;

@@ -24,7 +24,7 @@ export function MoverPanel({
 }) {
   console.log('movers', movers)
   return (
-    <Card className="rounded-xl bg-white shadow-[0_1px_1px_rgba(0,0,0,0.04)] ring-[#ebebeb] dark:bg-[#171717] dark:ring-[#4d4d4d]">
+    <Card className="rounded-xl bg-white shadow-[0_1px_1px_rgba(0,0,0,0.04)] ring-[#ebebeb]">
       <CardHeader className="flex-row items-start justify-between">
         <div>
           <CardTitle>Moving services</CardTitle>
@@ -37,7 +37,7 @@ export function MoverPanel({
       </CardHeader>
       <CardContent>
         {warning ? (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
             {warning}
           </div>
         ) : null}
@@ -51,14 +51,14 @@ export function MoverPanel({
           {movers.map((item) => (
             <div
               key={item.id}
-              className={`rounded-lg border p-4 text-left transition ${selected === item.id ? "border-[#0070f3] bg-[#d3e5ff]/35 dark:border-[#50e3c2] dark:bg-white/5" : "border-border hover:border-[#171717]/40 dark:hover:border-white/40"}`}
+              className={`rounded-lg border p-4 text-left transition ${selected === item.id ? "border-[#0070f3] bg-[#d3e5ff]/35" : "border-border hover:border-[#171717]/40"}`}
             >
               <div className="flex items-start justify-between">
-                <div className="grid size-9 place-items-center rounded-md bg-[#f2f2f2] text-[#0070f3] dark:bg-white/10 dark:text-[#50e3c2]">
+                <div className="grid size-9 place-items-center rounded-md bg-[#f2f2f2] text-[#0070f3]">
                   <Truck className="size-4" />
                 </div>
                 {selected === item.id && (
-                  <Check className="size-4 text-[#0070f3] dark:text-[#50e3c2]" />
+                  <Check className="size-4 text-[#0070f3]" />
                 )}
               </div>
               <div className="mt-4 text-sm font-semibold">{item.name}</div>
@@ -88,11 +88,11 @@ export function MoverPanel({
               <button
                 type="button"
                 onClick={() => onSelect(item.id)}
-                className="mt-4 min-h-11 w-full rounded-md bg-[#171717] px-3 py-2 text-xs font-medium text-white hover:bg-[#171717]/85 dark:bg-white dark:text-[#171717] dark:hover:bg-white/85"
+                className="mt-4 min-h-11 w-full rounded-md bg-[#171717] px-3 py-2 text-xs font-medium text-white hover:bg-[#171717]/85"
               >
                 {selected === item.id ? "Selected" : "Select service"}
               </button>
-              <div className="mt-3 flex flex-wrap gap-3 text-xs font-medium text-[#0761d1] dark:text-[#50e3c2]">
+              <div className="mt-3 flex flex-wrap gap-3 text-xs font-medium text-[#0761d1]">
                 {item.phone ? (
                   <a href={`tel:${item.phone}`}>
                     <Phone className="inline size-3" /> {item.phone}

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { housingListingUrl, type Housing } from "@/lib/relocation";
 import { money } from "@/shared/lib/format";
+import { MapInteractionGuard } from "./map-interaction-guard";
 
 export function HousingMap({
   listings,
@@ -152,7 +153,7 @@ export function HousingMap({
   console.log('listings', listings)
 
   return (
-    <Card className="gap-0 overflow-hidden rounded-xl bg-card py-0 ring-[#ebebeb] dark:ring-[#4d4d4d]">
+    <Card className="gap-0 overflow-hidden rounded-xl bg-card py-0 ring-[#ebebeb]">
       <CardHeader className="gap-3 px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
@@ -171,7 +172,9 @@ export function HousingMap({
       <CardContent className="px-0">
         <div className="relative h-[420px] w-full bg-[#171717] sm:h-[500px]">
           {token && mappableListings.length > 0 ? (
-            <div ref={mapContainer} className="size-full" />
+            <MapInteractionGuard>
+              <div ref={mapContainer} className="size-full" />
+            </MapInteractionGuard>
           ) : (
             <div className="flex size-full flex-col items-center justify-center gap-2 p-6 text-center text-white">
               <MapPin aria-hidden="true" className="size-6 text-[#50e3c2]" />

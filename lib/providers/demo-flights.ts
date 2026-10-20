@@ -81,7 +81,6 @@ export async function searchFlightConnections(input: {
     status: "fallback",
     isDemoData: true,
     fetchedAt: new Date().toISOString(),
-    warning:
-      "These are fictional examples for demonstration only, not actual airlines, airports, flights or available routes. Do not use them for travel decisions.",
+    warning: "",
   };
 }
