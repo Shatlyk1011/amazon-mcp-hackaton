@@ -20,7 +20,7 @@ APP_URL=http://localhost:3000
 
 `DATABASE_URL` is required for saved plans. `OPENAI_API_KEY` is required only for text requests; direct edits and selections work without OpenAI. `OPENAI_MODEL` is configurable. These keys are server-only and must not use the `NEXT_PUBLIC_` prefix.
 
-Configure Mapbox, RentCast, TomTom and optionally AirLabs for provider results. Set `AIRLABS_API_KEY` to your [AirLabs API key](https://airlabs.co/) and `MAPBOX_ACCESS_TOKEN` for city geocoding. Without a working AirLabs connection, flight searches return clearly labeled fictional examples, with no API key required; these are not real routes or flights. Live flight suggestions use a limited sample of recurring routes from nearby airports; they do not confirm flights on a specific date, viable transfers, fares or seat availability. Verify details before booking. No provider credentials are passed to OpenAI.
+Configure Mapbox, RentCast and TomTom for provider results. Flight searches return clearly labeled fictional examples and require no flight API key; these are not real airlines, routes or flights and should not be used for travel decisions. No provider credentials are passed to OpenAI.
 
 For deployment, set `APP_URL` to the exact HTTPS application origin. The server-side MCP client uses this configured origin, never a model-provided URL or untrusted Host header. It must be reachable by the application's server. If the development server chooses a different port, update `APP_URL`. Set the hosting request timeout to support the messages route's 180-second maximum.
 
@@ -85,6 +85,8 @@ Public `/api/mcp` exposes four additional standalone tools:
 - `answer_move_intake({ state, answer: { questionId, choice? , text?, monthlyIncome? } })`: validate an answer and return the next interview state. Selected options and numeric/date answers do not need OpenAI; descriptive custom answers do. Only fields relevant to the current question may change.
 - `get_relocation_rent_guidance({ cities, bedrooms })`: compare sourced asking-rent samples for one to three cities, or report unavailable data.
 - `generate_move_plan({ state })`: recompute completeness on the server, returning `needs_input` and the next question if necessary. A complete state produces route/map coordinates, housing, movers, budget, strategies, timeline, readiness and briefing.
+
+`prepare_move_intake` also advertises an MCP Apps UI resource. Compatible hosts can render a single-question quiz with radio choices and a custom answer field. The widget advances by calling `answer_move_intake` and, on completion, shares the latest state with the conversation. Clients without MCP Apps support can use the text and structured tool results directly. UI rendering and message support depend on the host; terminal-native controls are not provided by this resource.
 
 MCP callers pass the latest returned state and present the next question as choices plus a free-text alternative (or read it aloud). These public tools do not depend on a UI or read private browser profiles. Their state and generated results are non-persistent; the caller retains the snapshot. The browser HTTP adapter persists the same state in Neon and links completion to a saved dashboard. Third-party persistence under a user's account still requires account linking/authentication.
 

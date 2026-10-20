@@ -176,6 +176,41 @@ describe("public MCP standalone contracts", () => {
       await client.close();
     }
   });
+  it("exposes the quiz resource and keeps text and structured intake results in sync", async () => {
+    const client = await connectPublic();
+    try {
+      const tools = await client.listTools();
+      const prepare = tools.tools.find(
+        (tool) => tool.name === "prepare_move_intake",
+      );
+      expect(prepare?._meta?.ui).toEqual({
+        resourceUri: "ui://moveflow/quiz.html",
+      });
+      const resource = await client.readResource({
+        uri: "ui://moveflow/quiz.html",
+      });
+      expect(resource.contents[0]).toMatchObject({
+        mimeType: "text/html;profile=mcp-app",
+      });
+      expect(resource.contents[0]).toHaveProperty(
+        "text",
+        expect.stringContaining("answer_move_intake"),
+      );
+      const result = await client.callTool({
+        name: "prepare_move_intake",
+        arguments: { known: { origin: "Boston, MA" } },
+      });
+      expect(result.structuredContent).toEqual(
+        JSON.parse((result.content as { text: string }[])[0].text),
+      );
+      expect(
+        (result.structuredContent as { nextQuestion: { id: string } })
+          .nextQuestion.id,
+      ).toBe("destination");
+    } finally {
+      await client.close();
+    }
+  });
   it("discovers the complete documented tool surface", async () => {
     const client = await connectPublic();
     try {
@@ -199,7 +234,6 @@ describe("public MCP standalone contracts", () => {
       vi.stubEnv("MAPBOX_ACCESS_TOKEN", "");
       vi.stubEnv("RENTCAST_API_KEY", "");
       vi.stubEnv("TOMTOM_API_KEY", "");
-      vi.stubEnv("AIRLABS_API_KEY", "");
       const client = await connectPublic();
       try {
         const result = await client.callTool({ name, arguments: args });
@@ -214,7 +248,6 @@ describe("public MCP standalone contracts", () => {
   );
 
   it("returns explicitly simulated flight examples through MCP without an API key", async () => {
-    vi.stubEnv("AIRLABS_API_KEY", "");
     const client = await connectPublic();
     try {
       const result = await client.callTool({

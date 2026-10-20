@@ -16,7 +16,7 @@ import {
   readinessSnapshotSchema,
 } from "@/lib/relocation-insights";
 import { searchHousing } from "@/lib/providers/rentcast";
-import { searchFlightConnections } from "@/lib/providers/airlabs";
+import { searchFlightConnections } from "@/lib/providers/demo-flights";
 import {
   essentialCategorySchema,
   searchDestinationEssentials,
@@ -80,7 +80,7 @@ const publicMcpHandler = createMcpHandler((server) => {
     "suggest_flight_connections",
     {
       description:
-        "Suggest potential direct and one-stop airline routes from recurring AirLabs route data. If the provider is unavailable, returns clearly marked fictional demo examples; never present them as actual flights or routes. Operating dates, connections, fares, seats and booking availability must be verified.",
+        "Return fictional direct and one-stop flight examples for demonstration only. These are not real airlines, flights, routes, schedules, fares, or booking availability; never present them as actual travel options.",
       inputSchema: z
         .object({
           origin: z.string().trim().min(2).max(200),

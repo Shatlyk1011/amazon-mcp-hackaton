@@ -149,30 +149,6 @@ export function pendingQuestions(state: IntakeState): IntakeQuestion[] {
         },
       ],
     });
-  if (f.pets === undefined)
-    questions.push({
-      id: "pets",
-      title: "Are any pets coming along?",
-      description: "This helps with pet-friendly housing and travel estimates.",
-      placeholder: "For example: 2 dogs and 1 cat",
-      options: [
-        {
-          id: "none",
-          label: "No pets",
-          values: { pets: 0, petFriendly: false, petInfo: "No pets" },
-        },
-        {
-          id: "dog",
-          label: "One dog",
-          values: { pets: 1, petFriendly: true, petInfo: "One dog" },
-        },
-        {
-          id: "cat",
-          label: "One cat",
-          values: { pets: 1, petFriendly: true, petInfo: "One cat" },
-        },
-      ],
-    });
   if (!f.movingDate || f.movingDate < state.referenceDate)
     questions.push({
       id: "movingDate",
@@ -206,23 +182,6 @@ export function pendingQuestions(state: IntakeState): IntakeQuestion[] {
         },
       ],
     });
-  if (
-    f.needsHousing !== false &&
-    f.minBedrooms === undefined &&
-    f.bedrooms === undefined
-  )
-    questions.push({
-      id: "bedrooms",
-      title: "How many bedrooms will you need?",
-      description: "Include space for family or a home office.",
-      placeholder: "Number of bedrooms",
-      inputType: "number",
-      options: [1, 2, 3, 4].map((n) => ({
-        id: String(n),
-        label: `${n} bedroom${n === 1 ? "" : "s"}`,
-        values: { minBedrooms: n, bedrooms: n },
-      })),
-    });
   if (f.furniture === undefined)
     questions.push({
       id: "belongings",
@@ -236,26 +195,6 @@ export function pendingQuestions(state: IntakeState): IntakeQuestion[] {
           id: "furniture",
           label: "Furniture + boxes",
           values: { furniture: true },
-        },
-      ],
-    });
-  if (f.transport === undefined)
-    questions.push({
-      id: "transport",
-      title: "How would you like to travel?",
-      description: "Choose a preference, or let us compare the options.",
-      placeholder: "Driving, airplane, or both",
-      options: [
-        {
-          id: "drive",
-          label: "Driving",
-          values: { transport: "drive" },
-        },
-        { id: "fly", label: "Airplane", values: { transport: "fly" } },
-        {
-          id: "compare",
-          label: "Both driving and airplane",
-          values: { transport: "compare" },
         },
       ],
     });
@@ -323,41 +262,6 @@ export function pendingQuestions(state: IntakeState): IntakeQuestion[] {
       ],
     });
   }
-  if (
-    f.workInfo === undefined &&
-    f.accessibilityNeeds === undefined &&
-    f.otherNeeds === undefined
-  )
-    questions.push({
-      id: "priorities",
-      title: "Anything else we should plan around?",
-      description:
-        "Add work or commute needs, schools, accessibility, neighborhood preferences, or other priorities. You can skip this step.",
-      placeholder:
-        "For example: remote work, an office room, and step-free access",
-      options: [
-        {
-          id: "none",
-          label: "No other requirements",
-          values: { otherNeeds: "No additional requirements" },
-        },
-        {
-          id: "remote",
-          label: "I work from home",
-          values: {
-            workInfo: "Remote work; consider space for working at home",
-          },
-        },
-        {
-          id: "school",
-          label: "Schools matter",
-          values: {
-            otherNeeds:
-              "Consider schools near housing; verify school assignments independently",
-          },
-        },
-      ],
-    });
   return questions;
 }
 
@@ -382,6 +286,9 @@ export function intakeView(raw: IntakeState): IntakeView {
   const questions = pendingQuestions(state);
   const assumptions = [
     "Cost estimates are planning estimates, not travel or mover quotes.",
+    ...(state.fields.pets === undefined
+      ? ["No pets are included unless you add them to your move details."]
+      : []),
     ...(state.fields.suitcases === undefined
       ? ["Packing allowance uses two suitcases per traveler unless specified."]
       : []),
@@ -512,11 +419,13 @@ export function completeIntake(state: IntakeState): RelocationInput {
     ...f,
     scenario: adults + children > 1 ? "family" : "alone",
     flexible: f.flexible ?? false,
+    pets: f.pets ?? 0,
+    transport: "compare",
     bedrooms: f.bedrooms ?? Math.max(1, f.minBedrooms ?? 1),
-    minBedrooms: f.needsHousing ? (f.minBedrooms ?? f.bedrooms ?? 1) : 0,
+    minBedrooms: f.needsHousing ? (f.minBedrooms ?? f.bedrooms ?? 0) : 0,
     maxRent: f.needsHousing ? f.maxRent : 0,
     suitcases: f.suitcases ?? 2 * (adults + children),
-    petFriendly: f.petFriendly ?? f.pets! > 0,
+    petFriendly: f.petFriendly ?? (f.pets ?? 0) > 0,
     planningContext: {
       includedSavedContext: state.contextIncluded,
       workInfo: f.workInfo,

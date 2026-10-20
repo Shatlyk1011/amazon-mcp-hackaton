@@ -103,7 +103,7 @@ export function recommendations(input: RelocationInput) {
     {
       id: "cheapest",
       label: "Cheapest",
-      transport: family ? "Drive + truck rental" : "Train or bus",
+      transport: family ? "Drive + truck rental" : "Drive",
       service: family ? "Truck rental" : "Self-move",
       cost: Math.round(
         (family ? 980 : 180) + moveBase * 0.35 + input.pets * 120,
@@ -117,14 +117,14 @@ export function recommendations(input: RelocationInput) {
     {
       id: "recommended",
       label: "Recommended",
-      transport: family ? "Drive (compare flying)" : "Train",
+      transport: "Drive (compare flying)",
       service: family ? "Moving labor + truck" : "No mover",
       cost: Math.round(
         (family ? 1680 : 320) + moveBase * 0.55 + input.pets * 150,
       ),
       explanation: family
         ? "A truck plus loading help balances control, comfort, and the furniture you need to move."
-        : "Rail keeps the trip simple and leaves more of the budget for deposits and setup.",
+        : "Compare driving and flying while leaving room in the budget for deposits and setup.",
       advantages: ["Balanced cost and effort", "Clear contingency"],
       tradeoffs: ["Requires planning"],
     },

@@ -14,6 +14,7 @@ import {
   intakeStateSchema,
 } from "./schema";
 import { continueIntake, getRentGuidance, prepareIntake } from "./service";
+import { quizHtml, quizResourceUri } from "./quiz-app";
 
 const annotations = {
   readOnlyHint: true,
@@ -23,8 +24,10 @@ const annotations = {
 };
 async function output(work: () => Promise<unknown>) {
   try {
+    const result = await work();
     return {
-      content: [{ type: "text" as const, text: JSON.stringify(await work()) }],
+      content: [{ type: "text" as const, text: JSON.stringify(result) }],
+      structuredContent: result as Record<string, unknown>,
     };
   } catch (error) {
     return {
@@ -45,11 +48,29 @@ async function output(work: () => Promise<unknown>) {
 // Public tools are stateless: the caller owns the explicit state snapshot.
 // Browser sessions persist this same snapshot in the owner-scoped intake table.
 export function registerIntakeTools(server: McpServer) {
+  server.registerResource(
+    "move-quiz",
+    quizResourceUri,
+    {
+      title: "Move setup quiz",
+      mimeType: "text/html;profile=mcp-app",
+    },
+    async (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "text/html;profile=mcp-app",
+          text: quizHtml,
+        },
+      ],
+    }),
+  );
   server.registerTool(
     "prepare_move_intake",
     {
       description:
         "Start an adaptive relocation interview from a short prompt and/or partial structured requirements. Never fills missing essentials with demo defaults. Returns ready, nextQuestion with selectable options and free-text support, summary and caller-owned state. Optional supplied savedContext is used only when includeContext is true. Does not read browser sessions or save data. Ask the returned question before generating a plan.",
+      _meta: { ui: { resourceUri: quizResourceUri } },
       inputSchema: z.object({
         prompt: z.string().trim().max(4000).default(""),
         known: intakeFieldsSchema.default({}),

@@ -29,25 +29,33 @@ function without(...keys: (keyof IntakeFields)[]) {
 beforeEach(() => vi.clearAllMocks());
 
 describe("shared UI and MCP move intake", () => {
-  it("keeps generated strategy recommendations consistent with explicit travel preferences", () => {
-    const input = completeIntake(
-      beginIntake({ ...full, transport: "fly", furniture: false }, {}, "", now),
-    );
-    for (const option of recommendations(input)) {
-      expect(option.transport).toContain("Fly");
-      expect(option.service).toBe("No mover needed");
-    }
-  });
-  it("asks about travel only when neither optional transport checkbox was supplied", () => {
-    const missing = beginIntake(without("transport"), {}, "", now);
-    expect(intakeView(missing).nextQuestion?.id).toBe("transport");
-    const selected = beginIntake(
-      { ...without("transport"), transport: "compare" },
+  it("skips optional questions and includes both travel modes", () => {
+    const state = beginIntake(
+      without(
+        "pets",
+        "petFriendly",
+        "bedrooms",
+        "minBedrooms",
+        "transport",
+        "otherNeeds",
+      ),
       {},
       "",
       now,
     );
-    expect(intakeView(selected).ready).toBe(true);
+    expect(intakeView(state).ready).toBe(true);
+    const input = completeIntake(state);
+    expect(input).toMatchObject({
+      pets: 0,
+      minBedrooms: 0,
+      transport: "compare",
+    });
+    expect(input.planningContext?.assumptions.join(" ")).toContain("No pets");
+    const modes = recommendations(input)
+      .map((option) => option.transport)
+      .join(" ");
+    expect(modes).toContain("Drive");
+    expect(modes).toContain("Fly");
   });
   it("leaves missing essentials unknown and refuses premature generation", () => {
     const state = beginIntake(
@@ -162,7 +170,7 @@ describe("shared UI and MCP move intake", () => {
       children: 3,
       destination: "Austin, TX",
     });
-    expect(view.nextQuestion?.id).toBe("pets");
+    expect(view.nextQuestion?.id).toBe("movingDate");
   });
   it("validates a collected questionnaire in sequence before one saved update", async () => {
     const view = await continueIntakeBatch(
@@ -174,20 +182,16 @@ describe("shared UI and MCP move intake", () => {
       ),
       [
         { questionId: "household", choice: "solo" },
-        { questionId: "pets", choice: "none" },
         { questionId: "movingDate", choice: "30" },
         { questionId: "housing", choice: "no" },
         { questionId: "belongings", choice: "luggage" },
-        { questionId: "transport", choice: "drive" },
         { questionId: "budget", choice: "estimate" },
-        { questionId: "priorities", choice: "none" },
       ],
     );
     expect(view.ready).toBe(true);
     expect(view.state.fields).toMatchObject({
       needsHousing: false,
       furniture: false,
-      transport: "drive",
     });
   });
   it("uses no LLM when a standalone caller provides structured context", async () => {

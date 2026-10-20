@@ -417,25 +417,8 @@ export function VoicePlanRecorder({
           ) : null}
         </div>
 
-        {contextControls}
-
-        {error || serverError ? (
-          <Alert
-            variant="destructive"
-            className={compact ? "max-w-none" : "mt-5 max-w-xl"}
-          >
-            <AlertDescription>{error || serverError}</AlertDescription>
-          </Alert>
-        ) : null}
-
         {state === "review" ? (
-          <div
-            className={
-              compact
-                ? "flex w-full flex-col gap-4"
-                : "mt-7 flex w-full max-w-xl flex-col gap-4"
-            }
-          >
+          <div className={compact ? "w-full" : "mt-7 w-full max-w-xl"}>
             <Field data-disabled={pending || undefined}>
               <FieldLabel htmlFor="voice-plan-transcript">
                 Review your request
@@ -458,7 +441,28 @@ export function VoicePlanRecorder({
                   : "Describe your move, then we’ll ask for any missing details."}
               </FieldDescription>
             </Field>
+          </div>
+        ) : null}
 
+        {contextControls}
+
+        {error || serverError ? (
+          <Alert
+            variant="destructive"
+            className={compact ? "max-w-none" : "mt-5 max-w-xl"}
+          >
+            <AlertDescription>{error || serverError}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        {state === "review" ? (
+          <div
+            className={
+              compact
+                ? "flex w-full flex-col gap-4"
+                : "mt-7 flex w-full max-w-xl flex-col gap-4"
+            }
+          >
             <div
               className={
                 compact
