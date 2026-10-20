@@ -3,9 +3,9 @@ import { calculateMapboxRoute, type RouteResult } from "@/lib/providers/mapbox";
 
 export const relocationInputSchema = z.object({
   scenario: z.enum(["alone", "family"]),
-  origin: z.string().min(2),
-  destination: z.string().min(2),
-  movingDate: z.string(),
+  origin: z.string().trim().min(2).max(200),
+  destination: z.string().trim().min(2).max(200),
+  movingDate: z.iso.date(),
   flexible: z.boolean(),
   budget: z.number().nonnegative(),
   adults: z.number().int().positive(),
@@ -19,7 +19,31 @@ export const relocationInputSchema = z.object({
   maxRent: z.number().nonnegative(),
   minBedrooms: z.number().int().nonnegative(),
   petFriendly: z.boolean(),
-  neighborhood: z.string().optional(),
+  neighborhood: z.string().max(300).optional(),
+  planningContext: z
+    .object({
+      includedSavedContext: z.boolean(),
+      workInfo: z.string().max(1500).optional(),
+      petInfo: z.string().max(1000).optional(),
+      accessibilityNeeds: z.string().max(1000).optional(),
+      otherNeeds: z.string().max(1500).optional(),
+      sources: z.record(z.string(), z.string()),
+      assumptions: z.array(z.string()),
+      rentEvidence: z
+        .object({
+          destination: z.string(),
+          bedrooms: z.number(),
+          sampleSize: z.number(),
+          source: z.string(),
+          fetchedAt: z.string(),
+          low: z.number().optional(),
+          median: z.number().optional(),
+          high: z.number().optional(),
+          explanation: z.string(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export type RelocationInput = z.infer<typeof relocationInputSchema>;
@@ -75,7 +99,7 @@ export async function calculateRoute(
 export function recommendations(input: RelocationInput) {
   const family = input.scenario === "family";
   const moveBase = input.furniture ? (family ? 2350 : 1500) : 0;
-  return [
+  const strategies = [
     {
       id: "cheapest",
       label: "Cheapest",
@@ -117,11 +141,35 @@ export function recommendations(input: RelocationInput) {
       tradeoffs: ["Highest estimate"],
     },
   ];
+  return strategies.map((strategy, index) => ({
+    ...strategy,
+    service: input.furniture
+      ? ["Truck rental", "Moving labor + truck", "Full-service movers"][index]
+      : "No mover needed",
+    transport:
+      input.transport === "drive"
+        ? [
+            "Drive + self-move",
+            "Drive with loading help",
+            "Drive with planned overnight stops",
+          ][index]
+        : input.transport === "fly"
+          ? [
+              "Fly economy",
+              "Fly + coordinate luggage or shipping",
+              "Fly + door-to-door support",
+            ][index]
+          : strategy.transport,
+    explanation:
+      input.transport === "compare"
+        ? strategy.explanation
+        : `${input.transport === "drive" ? "Driving" : "Flying"} follows your stated travel preference. ${input.furniture ? "Compare transport for your furniture separately." : "Plan around your luggage rather than a full household shipment."} ${strategy.label === "Cheapest" ? "This option prioritizes cost." : strategy.label === "Recommended" ? "This option balances cost and effort." : "This option prioritizes support and comfort."}`,
+  }));
 }
 
 export function calculateBudget(
   input: RelocationInput,
-  selectedHousing?: Housing,
+  selectedHousing?: Pick<Housing, "monthlyRent">,
 ) {
   const housingUpfront = selectedHousing
     ? selectedHousing.monthlyRent * 2 + 250

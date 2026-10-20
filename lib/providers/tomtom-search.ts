@@ -34,6 +34,35 @@ export type MovingServiceSearchResult = {
   warning?: string;
 };
 
+export const essentialCategorySchema = z.enum([
+  "grocery",
+  "pharmacy",
+  "hospital",
+  "school",
+  "veterinarian",
+  "public transit",
+]);
+
+export type EssentialCategory = z.infer<typeof essentialCategorySchema>;
+export type DestinationEssential = {
+  id: string;
+  name: string;
+  category: EssentialCategory;
+  address?: string;
+  phone?: string;
+  website?: string;
+  distanceMiles?: number;
+  isDemoData: boolean;
+};
+
+export type DestinationEssentialsResult = {
+  essentials: DestinationEssential[];
+  source: string;
+  status: "live" | "fallback" | "unavailable";
+  fetchedAt: string;
+  warning?: string;
+};
+
 function searchQuery(input: MovingServiceSearchInput) {
   return input.furniture ? "moving company" : "moving services";
 }
@@ -90,7 +119,7 @@ export async function searchMovingServices(
   try {
     const response = await fetch(
       `https://api.tomtom.com/search/2/search/${encodeURIComponent(query)}.json?${params.toString()}`,
-      { cache: "no-store" },
+      { signal: AbortSignal.timeout(15_000), cache: "no-store" },
     );
     if (!response.ok)
       throw new Error(`TomTom Search request failed with ${response.status}`);
@@ -119,6 +148,104 @@ export async function searchMovingServices(
   } catch (error) {
     return {
       movers: [],
+      source: "TomTom Search API",
+      status: "unavailable",
+      fetchedAt,
+      warning:
+        error instanceof Error ? error.message : "TomTom Search request failed",
+    };
+  }
+}
+
+export async function searchDestinationEssentials(input: {
+  destination: string;
+  categories: EssentialCategory[];
+  destinationCoordinates?: { longitude: number; latitude: number };
+}): Promise<DestinationEssentialsResult> {
+  const fetchedAt = new Date().toISOString();
+  const categories = [...new Set(input.categories)];
+
+  if (process.env.NODE_ENV === "development") {
+    return {
+      essentials: categories.map((category, index) => ({
+        id: `demo-${category.replaceAll(" ", "-")}`,
+        name: `Sample ${category}`,
+        category,
+        address: `Near ${input.destination}`,
+        distanceMiles: Math.round((0.8 + index * 0.7) * 10) / 10,
+        isDemoData: true,
+      })),
+      source: "TomTom Search API · development response",
+      status: "fallback",
+      fetchedAt,
+      warning:
+        "Sample places are shown in development and are not live listings.",
+    };
+  }
+
+  const token = process.env.TOMTOM_API_KEY;
+  if (!token) {
+    return {
+      essentials: [],
+      source: "TomTom Search API",
+      status: "unavailable",
+      fetchedAt,
+      warning:
+        "TOMTOM_API_KEY is not configured; destination essentials are unavailable.",
+    };
+  }
+
+  try {
+    const groups = await Promise.all(
+      categories.map(async (category) => {
+        const query = input.destinationCoordinates
+          ? category
+          : `${category} near ${input.destination}`;
+        const params = new URLSearchParams({
+          key: token,
+          idxSet: "POI",
+          countrySet: "US",
+          limit: "5",
+          maxFuzzyLevel: "4",
+        });
+        if (input.destinationCoordinates) {
+          params.set("lat", String(input.destinationCoordinates.latitude));
+          params.set("lon", String(input.destinationCoordinates.longitude));
+          params.set("radius", "25000");
+        }
+        const response = await fetch(
+          `https://api.tomtom.com/search/2/search/${encodeURIComponent(query)}.json?${params.toString()}`,
+          { signal: AbortSignal.timeout(15_000), cache: "no-store" },
+        );
+        if (!response.ok)
+          throw new Error(
+            `TomTom Search request failed with ${response.status}`,
+          );
+        const payload = tomTomSearchResponseSchema.parse(await response.json());
+        return payload.results.map((place): DestinationEssential => ({
+          id: place.id,
+          name: place.poi.name,
+          category,
+          address: place.address?.freeformAddress,
+          phone: place.poi.phone,
+          website: normalizedWebsite(place.poi.url),
+          distanceMiles:
+            place.dist === undefined
+              ? undefined
+              : Math.round((place.dist / 1609.344) * 10) / 10,
+          isDemoData: false,
+        }));
+      }),
+    );
+    return {
+      essentials: groups.flat(),
+      source: "TomTom Search API",
+      status: "live",
+      fetchedAt,
+    };
+  } catch (error) {
+    return {
+      essentials: [],
       source: "TomTom Search API",
       status: "unavailable",
       fetchedAt,

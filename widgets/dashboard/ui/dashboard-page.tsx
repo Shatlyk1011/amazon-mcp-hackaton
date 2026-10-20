@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import {
   ArrowRight,
   ChevronDown,
@@ -16,8 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   calculateBudget,
-  demoAlone,
-  demoFamily,
   recommendations,
   type Housing,
   type Mover,
@@ -32,6 +31,9 @@ import { BudgetPanel } from "@/widgets/dashboard/ui/budget-panel";
 import { MoverPanel } from "@/widgets/dashboard/ui/mover-panel";
 import { McpActivity, type Trace } from "@/widgets/dashboard/ui/mcp-explorer";
 import type { RouteResult } from "@/lib/providers/mapbox";
+import { MoveSetupSummary } from "./move-setup-summary";
+import { FlightSchedulesPanel } from "./flight-schedules-panel";
+import type { FlightScheduleResult } from "@/lib/providers/airlabs";
 
 function ToolSource({ tool }: { tool: string }) {
   return (
@@ -49,25 +51,35 @@ export function DashboardPage({
   input,
   traces,
   route,
+  flightSchedules,
   housing = [],
   movers = [],
   housingBrowseUrl = "https://www.zillow.com/",
   movingServicesSource,
   movingServicesWarning,
-  onSwitchScenario,
+  selectedHousing,
+  selectedMover,
+  onSelectHousing,
+  onSelectMover,
+  controls,
+  referenceDate,
 }: {
   input: RelocationInput;
   traces: Trace[];
   route: RouteResult | null;
+  flightSchedules?: FlightScheduleResult | null;
   housing?: Housing[];
-    movers?: Mover[];
+  movers?: Mover[];
   housingBrowseUrl?: string;
-    movingServicesSource?: string;
-    movingServicesWarning?: string;
-  onSwitchScenario: (input: RelocationInput) => void;
+  movingServicesSource?: string;
+  movingServicesWarning?: string;
+  selectedHousing: string | null;
+  selectedMover: string | null;
+  onSelectHousing: (id: string) => void;
+  onSelectMover: (id: string) => void;
+  controls?: ReactNode;
+  referenceDate: string;
 }) {
-  const [selectedHousing, setSelectedHousing] = useState<string | null>(null);
-  const [selectedMover, setSelectedMover] = useState<string | null>(null);
   const [housingFilters, setHousingFilters] = useState<HousingFilters>({
     minRent: "",
     maxRent: "",
@@ -136,9 +148,12 @@ export function DashboardPage({
       <section className="min-w-0">
         <header className="sticky top-0 z-20 mx-auto flex max-w-[1440px] items-center justify-between gap-4 border-b border-[#ebebeb] bg-[#fafafa]/90 px-5 py-4 backdrop-blur dark:border-[#4d4d4d] dark:bg-[#171717]/90 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-9 shrink-0 place-items-center rounded-md bg-[#171717] text-sm font-semibold text-white dark:bg-white dark:text-[#171717]">
+            <Link
+              href="/"
+              className="grid size-9 shrink-0 place-items-center rounded-md bg-[#171717] text-sm font-semibold text-white dark:bg-white dark:text-[#171717]"
+            >
               M
-            </div>
+            </Link>
             <div className="min-w-0">
               <div className="font-mono text-[11px] font-medium tracking-normal text-[#4d4d4d] dark:text-[#a1a1a1]">
                 MOVEFLOW · YOUR RELOCATION PLAN
@@ -210,14 +225,11 @@ export function DashboardPage({
               </div>
               <Button
                 size="sm"
-                onClick={() =>
-                  onSwitchScenario(
-                    input.scenario === "family" ? demoAlone : demoFamily,
-                  )
-                }
-                className="bg-[#171717] px-3 font-medium text-white hover:bg-[#171717]/85 dark:bg-white dark:text-[#171717] dark:hover:bg-white/85"
+                variant="outline"
+                nativeButton={false}
+                render={<Link href="/" />}
               >
-                Switch demo scenario <ArrowRight data-icon="inline-end" />
+                New moving plan <ArrowRight data-icon="inline-end" />
               </Button>
             </div>
             <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
@@ -265,29 +277,38 @@ export function DashboardPage({
               ))}
             </div>
             <div className="mt-10 flex flex-col gap-10">
+              {route ? (
+                <div className="flex flex-col gap-4">
+                  <ToolSource tool="calculate_route" />
+                  <RouteMap route={route} />
+                </div>
+              ) : null}
+              {flightSchedules ? (
+                <div className="flex flex-col gap-4">
+                  <ToolSource tool="suggest_flight_connections" />
+                  <FlightSchedulesPanel schedules={flightSchedules} />
+                </div>
+              ) : null}
+              {input.needsHousing ? (
+                <div className="flex flex-col gap-4">
+                  <ToolSource tool="search_housing" />
+                  <HousingMap
+                    listings={filteredHousing}
+                    onSelect={onSelectHousing}
+                  />
+                  <HousingPanel
+                    key={`${JSON.stringify(appliedHousingFilters)}:${filteredHousing.map((listing) => listing.id).join(",")}`}
+                    items={filteredHousing}
+                    totalItems={housing.length}
+                    browseUrl={housingBrowseUrl}
+                    selected={selectedHousing}
+                    onSelect={onSelectHousing}
+                    filters={housingFilters}
+                    onFiltersChange={setHousingFilters}
+                  />
+                </div>
+              ) : null}
               <div className="flex flex-col gap-4">
-                <ToolSource tool="calculate_route" />
-                <RouteMap route={route} />
-              </div>
-              <div className="flex flex-col gap-4">
-                <ToolSource tool="search_housing" />
-                <HousingMap
-                  listings={filteredHousing}
-                  onSelect={setSelectedHousing}
-                />
-                <HousingPanel
-                  key={`${JSON.stringify(appliedHousingFilters)}:${filteredHousing.map((listing) => listing.id).join(",")}`}
-                  items={filteredHousing}
-                  totalItems={housing.length}
-                  browseUrl={housingBrowseUrl}
-                  selected={selectedHousing}
-                  onSelect={setSelectedHousing}
-                  filters={housingFilters}
-                  onFiltersChange={setHousingFilters}
-                />
-              </div>
-              <div className="flex flex-col gap-4">
-                <ToolSource tool="recommend_moving_strategy" />
                 <Card className="rounded-xl bg-white shadow-[0_1px_1px_rgba(0,0,0,0.04)] ring-[#ebebeb] dark:bg-[#171717] dark:ring-[#4d4d4d]">
                   <CardHeader className="flex-row items-start justify-between">
                     <div>
@@ -314,7 +335,15 @@ export function DashboardPage({
                           {money(recs[1]?.cost ?? 0)}
                         </div>
                       </div>
-                      <Badge variant="secondary">Within budget</Badge>
+                      <Badge
+                        variant={
+                          budget.remaining >= 0 ? "secondary" : "destructive"
+                        }
+                      >
+                        {budget.remaining >= 0
+                          ? "Within budget"
+                          : "Over budget"}
+                      </Badge>
                     </div>
                     <Button className="mt-6 w-full rounded-md bg-[#171717] text-white hover:bg-[#171717]/85 dark:bg-white dark:text-[#171717] dark:hover:bg-white/85">
                       Use this strategy <ArrowRight data-icon="inline-end" />
@@ -324,7 +353,6 @@ export function DashboardPage({
               </div>
             </div>
             <div className="mt-10 flex flex-col gap-4">
-              <ToolSource tool="recommend_moving_strategy" />
               <div>
                 <h2 className="text-2xl font-semibold tracking-[-0.04em]">
                   Strategy options
@@ -386,14 +414,31 @@ export function DashboardPage({
               <MoverPanel
                 movers={movers}
                 selected={selectedMover}
-                onSelect={setSelectedMover}
+                onSelect={onSelectMover}
                 source={movingServicesSource}
                 warning={movingServicesWarning}
               />
             </div>
+            <MoveSetupSummary
+              referenceDate={referenceDate}
+              input={input}
+              route={route}
+              housing={housing}
+              movers={movers}
+              selectedHousing={selectedHousing}
+              selectedMover={selectedMover}
+            />
+            {controls ? <div className="h-20" aria-hidden="true" /> : null}
           </div>
         </div>
       </section>
+      {controls ? (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur sm:px-6">
+          <div className="mx-auto flex max-w-[1440px] justify-center lg:justify-end">
+            {controls}
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

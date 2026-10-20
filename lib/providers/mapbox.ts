@@ -51,7 +51,7 @@ function fallbackRoute(
 async function geocode(query: string, token: string) {
   const response = await fetch(
     `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${encodeURIComponent(token)}&limit=1&types=place,locality,region`,
-    { cache: "no-store" },
+    { signal: AbortSignal.timeout(15_000), cache: "no-store" },
   );
   if (!response.ok)
     throw new Error(`Mapbox geocoding failed with ${response.status}`);
@@ -66,6 +66,16 @@ async function geocode(query: string, token: string) {
   };
 }
 
+export async function geocodeMapboxPlace(query: string) {
+  const token = process.env.MAPBOX_ACCESS_TOKEN;
+  if (!token) return null;
+  try {
+    return await geocode(query, token);
+  } catch {
+    return null;
+  }
+}
+
 export async function calculateMapboxRoute(
   origin: string,
   destination: string,
@@ -77,7 +87,6 @@ export async function calculateMapboxRoute(
       destination,
       "MAPBOX_ACCESS_TOKEN is not configured",
     );
-  console.log("origin, destination", origin, destination);
   try {
     const [from, to] = await Promise.all([
       geocode(origin, token),
@@ -85,16 +94,13 @@ export async function calculateMapboxRoute(
     ]);
     const response = await fetch(
       `https://api.mapbox.com/directions/v5/mapbox/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}?alternatives=false&geometries=geojson&overview=full&steps=false&access_token=${encodeURIComponent(token)}`,
-      { cache: "no-store" },
+      { signal: AbortSignal.timeout(15_000), cache: "no-store" },
     );
     if (!response.ok)
       throw new Error(`Mapbox directions failed with ${response.status}`);
     const parsed = directionsResponseSchema.parse(await response.json());
     const route = parsed.routes[0];
 
-    console.log("route", route);
-    console.log("from", from);
-    console.log("to", to);
     if (!route) throw new Error("Mapbox returned no driving routes");
     return {
       origin: from.label,

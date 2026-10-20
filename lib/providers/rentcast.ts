@@ -9,6 +9,7 @@ export type HousingSearchInput = {
   maxRent?: number;
   bedrooms?: number;
   petFriendly?: boolean;
+  liveOnly?: boolean;
 };
 
 export type HousingSearchResult = {
@@ -99,15 +100,17 @@ export async function searchHousing(
 ): Promise<HousingSearchResult> {
   const fetchedAt = new Date().toISOString();
   const token = process.env.RENTCAST_API_KEY;
-  const useDevelopmentData = process.env.NODE_ENV !== "production";
+  const useDevelopmentData =
+    !input.liveOnly && process.env.NODE_ENV !== "production";
   if (useDevelopmentData || !token) {
     return {
-      listings: DEMO_HOUSES,
-      source: "RentCast · development response",
+      listings: input.liveOnly ? [] : DEMO_HOUSES,
+      source: input.liveOnly ? "RentCast" : "RentCast · development response",
       status: "unavailable",
       fetchedAt,
-      warning:
-        useDevelopmentData
+      warning: input.liveOnly
+        ? "Live rental guidance requires RENTCAST_API_KEY."
+        : useDevelopmentData
           ? "Using the development response from data.ts"
           : "RENTCAST_API_KEY is not configured; showing the development response from data.ts",
       browseUrl: browseUrl(input.destination),
@@ -135,6 +138,7 @@ export async function searchHousing(
           Accept: "application/json",
           "X-Api-Key": token,
         },
+        signal: AbortSignal.timeout(15_000),
         cache: "no-store",
       },
     );

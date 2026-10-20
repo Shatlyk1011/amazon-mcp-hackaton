@@ -18,9 +18,9 @@ export type Trace = {
 const toolLabels: Record<string, string> = {
   create_relocation_plan: "Relocation plan",
   calculate_route: "Driving route",
+  suggest_flight_connections: "Flight routes",
   search_housing: "Housing search",
   search_moving_services: "Moving services",
-  recommend_moving_strategy: "Moving strategy",
   calculate_budget: "Budget estimate",
 };
 
