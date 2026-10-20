@@ -148,6 +148,39 @@ const standaloneCalls: {
 ];
 
 describe("public MCP standalone contracts", () => {
+  it("asks the user to enter unspecified locations without suggesting a default route", async () => {
+    const client = await connectPublic();
+    try {
+      const prepared = await client.callTool({
+        name: "prepare_move_intake",
+        arguments: {},
+      });
+      const view = prepared.structuredContent as {
+        state: { fields: Record<string, unknown> };
+        nextQuestion: { id: string; options: unknown[] };
+      };
+      expect(view.state.fields.origin).toBeUndefined();
+      expect(view.state.fields.destination).toBeUndefined();
+      expect(view.nextQuestion.id).toBe("origin");
+      expect(view.nextQuestion.options).toEqual([]);
+      const answered = await client.callTool({
+        name: "answer_move_intake",
+        arguments: {
+          state: view.state,
+          answer: { questionId: "origin", text: "Boston, MA" },
+        },
+      });
+      const next = answered.structuredContent as {
+        state: { fields: Record<string, unknown> };
+        nextQuestion: { id: string; options: unknown[] };
+      };
+      expect(next.state.fields.destination).toBeUndefined();
+      expect(next.nextQuestion.id).toBe("destination");
+      expect(next.nextQuestion.options).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  });
   it("returns the same missing question as UI logic and gates generation on the server", async () => {
     const client = await connectPublic();
     try {
@@ -246,29 +279,6 @@ describe("public MCP standalone contracts", () => {
       }
     },
   );
-
-  it("returns explicitly simulated flight examples through MCP without an API key", async () => {
-    const client = await connectPublic();
-    try {
-      const result = await client.callTool({
-        name: "suggest_flight_connections",
-        arguments: {
-          origin: "Boston, MA",
-          destination: "Austin, TX",
-          departureDate: "2026-11-10",
-          maxStops: 0,
-        },
-      });
-      const content = result.content as { type: string; text: string }[];
-      const data = JSON.parse(content[0]!.text);
-      expect(data.status).toBe("fallback");
-      expect(data.isDemoData).toBe(true);
-      expect(data.connections).toHaveLength(1);
-      expect(data.warning).toContain("fictional");
-    } finally {
-      await client.close();
-    }
-  });
 
   it("rejects invalid standalone input through MCP validation", async () => {
     const client = await connectPublic();

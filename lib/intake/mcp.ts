@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
-import { z } from "zod";
+import { z, ZodError } from "zod";
+import { usCitySchema, US_ONLY_ERROR } from "@/lib/us-location";
 import { PlanError } from "@/lib/plans/errors";
 import { generatePlan } from "@/lib/plans/generate";
 import {
@@ -38,7 +39,10 @@ async function output(work: () => Promise<unknown>) {
           text:
             error instanceof PlanError
               ? error.message
-              : "The move intake could not be processed. Check the supplied details and retry.",
+              : error instanceof ZodError &&
+                  error.issues.some((issue) => issue.message === US_ONLY_ERROR)
+                ? US_ONLY_ERROR
+                : "The move intake could not be processed. Check the supplied details and retry.",
         },
       ],
     };
@@ -69,7 +73,7 @@ export function registerIntakeTools(server: McpServer) {
     "prepare_move_intake",
     {
       description:
-        "Start an adaptive relocation interview from a short prompt and/or partial structured requirements. Never fills missing essentials with demo defaults. Returns ready, nextQuestion with selectable options and free-text support, summary and caller-owned state. Optional supplied savedContext is used only when includeContext is true. Does not read browser sessions or save data. Ask the returned question before generating a plan.",
+        "Start an adaptive relocation interview from the user’s actual words and/or details the user explicitly provided. Leave unknown fields out of known; never invent or assume an origin, destination, or other answers. Do not answer questions or select options on the user’s behalf. Let the user complete the interactive quiz or ask them each returned question and wait for their answer before calling answer_move_intake. Returns ready, nextQuestion, summary and caller-owned state. Optional supplied savedContext is used only when includeContext is true. Does not read browser sessions or save data.",
       _meta: { ui: { resourceUri: quizResourceUri } },
       inputSchema: z.object({
         prompt: z.string().trim().max(4000).default(""),
@@ -92,7 +96,7 @@ export function registerIntakeTools(server: McpServer) {
     "answer_move_intake",
     {
       description:
-        "Answer the current intake question using its choice ID, a free-text answer, or optional monthlyIncome for the rent question. Pass the latest state returned by prepare_move_intake or this tool. Uses the same validation and missing-information rules as the browser quiz. Income itself is not retained, only the user-selected 30% rent ceiling. Returns the next question or ready=true. Does not persist data.",
+        "Record the user’s explicit answer to the current intake question using its choice ID, a free-text answer, or optional monthlyIncome for the rent question. Never choose or invent an answer for the user. Pass the latest state returned by prepare_move_intake or this tool. Uses the same validation and missing-information rules as the browser quiz. Income itself is not retained, only the user-selected 30% rent ceiling. Returns the next question or ready=true. Does not persist data.",
       inputSchema: z.object({
         state: intakeStateSchema,
         answer: intakeAnswerSchema,
@@ -107,7 +111,7 @@ export function registerIntakeTools(server: McpServer) {
       description:
         "Get a sourced local rent range from live listings for up to three cities. Returns sample size, date, 25th/50th/75th percentiles and limitations. Demo listings are excluded; unavailable data is explicit. Useful before asking a budget question or comparing destination costs. Does not save anything.",
       inputSchema: z.object({
-        cities: z.array(z.string().trim().min(2).max(200)).min(1).max(3),
+        cities: z.array(usCitySchema).min(1).max(3),
         bedrooms: z.number().int().min(0).max(20),
       }),
       annotations,

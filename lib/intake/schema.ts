@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { usIntakeLocationSchema } from "@/lib/us-location";
 import { relocationInputSchema } from "@/lib/relocation";
 
 // No defaults: an absent fact must remain absent until the user supplies it.
@@ -6,6 +7,8 @@ export const intakeFieldsSchema = relocationInputSchema
   .omit({ planningContext: true })
   .partial()
   .extend({
+    origin: usIntakeLocationSchema.optional(),
+    destination: usIntakeLocationSchema.optional(),
     adults: z.number().int().min(1).max(20).optional(),
     children: z.number().int().min(0).max(20).optional(),
     pets: z.number().int().min(0).max(20).optional(),

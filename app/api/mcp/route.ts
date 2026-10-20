@@ -1,6 +1,7 @@
 import type { AuthInfo } from "@modelcontextprotocol/server";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
+import { usCitySchema } from "@/lib/us-location";
 import { registerIntakeTools } from "@/lib/intake/mcp";
 import {
   calculateBudget,
@@ -67,7 +68,10 @@ const publicMcpHandler = createMcpHandler((server) => {
     "calculate_route",
     {
       description: "Calculate route distance and duration between two cities.",
-      inputSchema: z.object({ origin: z.string(), destination: z.string() }),
+      inputSchema: z.object({
+        origin: usCitySchema,
+        destination: usCitySchema,
+      }),
       annotations: providerAnnotations,
     },
     async (input) => ({
@@ -83,8 +87,8 @@ const publicMcpHandler = createMcpHandler((server) => {
         "Return fictional direct and one-stop flight examples for demonstration only. These are not real airlines, flights, routes, schedules, fares, or booking availability; never present them as actual travel options.",
       inputSchema: z
         .object({
-          origin: z.string().trim().min(2).max(200),
-          destination: z.string().trim().min(2).max(200),
+          origin: usCitySchema,
+          destination: usCitySchema,
           departureDate: z.iso.date(),
           maxStops: z.union([z.literal(0), z.literal(1)]).default(1),
         })
@@ -106,7 +110,7 @@ const publicMcpHandler = createMcpHandler((server) => {
       description:
         "Search rental listings near a destination using RentCast, with the bundled development response as a local fallback.",
       inputSchema: z.object({
-        destination: z.string(),
+        destination: usCitySchema,
         maxRent: z.number().optional(),
         bedrooms: z.number().optional(),
         petFriendly: z.boolean().optional(),
@@ -128,8 +132,8 @@ const publicMcpHandler = createMcpHandler((server) => {
       description:
         "Find real moving and relocation services near the origin using TomTom Search API. Results do not include quotes or destination-service guarantees.",
       inputSchema: z.object({
-        origin: z.string(),
-        destination: z.string(),
+        origin: usCitySchema,
+        destination: usCitySchema,
         furniture: z.boolean(),
       }),
       annotations: providerAnnotations,
@@ -249,7 +253,7 @@ const publicMcpHandler = createMcpHandler((server) => {
         "Find nearby settling-in essentials at a destination using TomTom Search. Results may be labeled development data or unavailable when the provider is not configured.",
       inputSchema: z
         .object({
-          destination: z.string().trim().min(2).max(200),
+          destination: usCitySchema,
           categories: z.array(essentialCategorySchema).min(1).max(6),
         })
         .strict(),

@@ -4,6 +4,7 @@ import {
   relocationInputSchema,
   type RelocationInput,
 } from "@/lib/relocation";
+import { isUsLocation, US_ONLY_ERROR } from "@/lib/us-location";
 import { PlanError } from "@/lib/plans/errors";
 import {
   intakeFieldsSchema,
@@ -98,12 +99,13 @@ function locationQuestion(
     NY: ["New York, NY", "Buffalo, NY", "Albany, NY"],
     CA: ["Los Angeles, CA", "San Francisco, CA", "San Diego, CA"],
   };
-  const popular = (state &&
-    (popularByState[state.abbreviation] ??
-      [...new Set(state.cities.map((c) => `${c.name}, ${c.stateAbbr}`))].slice(
-        0,
-        4,
-      ))) ?? ["New York, NY", "Austin, TX", "Dallas, TX", "Houston, TX"];
+  const popular =
+    (state &&
+      (popularByState[state.abbreviation] ??
+        [
+          ...new Set(state.cities.map((c) => `${c.name}, ${c.stateAbbr}`)),
+        ].slice(0, 4))) ??
+    [];
   return {
     id,
     title:
@@ -112,7 +114,7 @@ function locationQuestion(
         : `Which city${state ? ` in ${state.name}` : ""} are you moving to?`,
     description:
       "A city lets us find the right route, homes, and local services.",
-    placeholder: "City, state (for example, Austin, TX)",
+    placeholder: "Enter city and state",
     options: popular.map((city) => ({
       id: city,
       label: city,
@@ -373,6 +375,7 @@ export function answerIntake(
         "Please choose a city rather than a whole state or country.",
         422,
       );
+    if (!isUsLocation(text)) throw new PlanError(US_ONLY_ERROR, 422);
     return applyIntakeFields(state, { [q.id]: text });
   }
   if (["bedrooms", "rent", "budget"].includes(q.id)) {

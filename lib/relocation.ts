@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { usCitySchema } from "@/lib/us-location";
 import { calculateMapboxRoute, type RouteResult } from "@/lib/providers/mapbox";
 
 export const relocationInputSchema = z.object({
   scenario: z.enum(["alone", "family"]),
-  origin: z.string().trim().min(2).max(200),
-  destination: z.string().trim().min(2).max(200),
+  origin: usCitySchema,
+  destination: usCitySchema,
   movingDate: z.iso.date(),
   flexible: z.boolean(),
   budget: z.number().nonnegative(),
