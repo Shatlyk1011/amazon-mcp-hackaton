@@ -10,7 +10,7 @@
   - Budget calculations
   - Selection-based budget updates
   - MCP execution explorer
-- Added seven real MCP tools at `/api/mcp`.
+- Added fourteen independently callable MCP tools at `/api/mcp`.
 - Added `/api/agent` orchestration endpoint.
 - Added deterministic demo data and labeled assumptions.
 
@@ -58,13 +58,21 @@ MoveFlow exposes a real Streamable HTTP MCP endpoint:
 
 The MCP server registers these tools:
 
-- `create_relocation_plan`
+- `prepare_move_intake`
+- `answer_move_intake`
+- `get_relocation_rent_guidance`
+- `generate_move_plan`
+- `draft_relocation_plan`
 - `calculate_route`
 - `search_housing`
 - `search_moving_services`
-- `recommend_moving_strategy`
 - `calculate_budget`
-- `update_relocation_selection`
+- `preview_relocation_selection`
+- `build_move_timeline`
+- `assess_move_readiness`
+- `compare_housing_options`
+- `find_destination_essentials`
+- `create_move_briefing`
 
 An MCP client initializes a session, discovers tools with `tools/list`, then executes tools with `tools/call`. Each tool validates input with Zod and returns structured JSON-compatible output.
 
