@@ -101,16 +101,20 @@ export async function calculateRoute(
 
 export function recommendations(input: RelocationInput) {
   const family = input.scenario === "family";
-  const moveBase = input.furniture ? (family ? 2350 : 1500) : 0;
+  const estimates = input.expenseEstimates;
+  if (
+    estimates?.cheapestStrategy === undefined ||
+    estimates.recommendedStrategy === undefined ||
+    estimates.comfortableStrategy === undefined
+  )
+    throw new Error("Moving strategy estimates are unavailable.");
   const strategies = [
     {
       id: "cheapest",
       label: "Cheapest",
       transport: family ? "Drive + truck rental" : "Drive",
       service: family ? "Truck rental" : "Self-move",
-      cost: Math.round(
-        (family ? 980 : 180) + moveBase * 0.35 + input.pets * 120,
-      ),
+      cost: estimates.cheapestStrategy,
       explanation: family
         ? "Driving and loading your own truck keeps the cash cost down for a furnished move."
         : "With a couple of suitcases, a full-service mover would add cost without solving a real need.",
@@ -122,9 +126,7 @@ export function recommendations(input: RelocationInput) {
       label: "Recommended",
       transport: "Drive (compare flying)",
       service: family ? "Moving labor + truck" : "No mover",
-      cost: Math.round(
-        (family ? 1680 : 320) + moveBase * 0.55 + input.pets * 150,
-      ),
+      cost: estimates.recommendedStrategy,
       explanation: family
         ? "A truck plus loading help balances control, comfort, and the furniture you need to move."
         : "Compare driving and flying while leaving room in the budget for deposits and setup.",
@@ -136,7 +138,7 @@ export function recommendations(input: RelocationInput) {
       label: "Most comfortable",
       transport: family ? "Fly + ship furniture" : "Fly",
       service: family ? "Full-service movers" : "Door-to-door help",
-      cost: Math.round((family ? 3100 : 780) + moveBase + input.pets * 220),
+      cost: estimates.comfortableStrategy,
       explanation: family
         ? "Professional packing and transport reduce disruption for children and a pet."
         : "Flying is fastest when your move fits in luggage and a small shipment.",
@@ -175,34 +177,30 @@ export function calculateBudget(
   selectedHousing?: Pick<Housing, "monthlyRent">,
 ) {
   const estimates = input.expenseEstimates;
+  if (
+    !estimates ||
+    estimates.monthlyRent === undefined ||
+    estimates.housingFees === undefined ||
+    estimates.includeSecurityDeposit === undefined ||
+    estimates.transportation === undefined ||
+    estimates.moving === undefined ||
+    estimates.additional === undefined ||
+    estimates.temporaryAccommodation === undefined ||
+    estimates.minimalNonHousing === undefined ||
+    estimates.fullServiceNonHousing === undefined
+  )
+    throw new Error("Moving expense estimates are unavailable.");
   const monthlyRent = input.needsHousing
-    ? (selectedHousing?.monthlyRent ?? estimates?.monthlyRent ?? input.maxRent)
+    ? (selectedHousing?.monthlyRent ?? estimates.monthlyRent)
     : 0;
-  const includeSecurityDeposit = estimates?.includeSecurityDeposit ?? true;
-  const housingFees = input.needsHousing ? (estimates?.housingFees ?? 250) : 0;
+  const includeSecurityDeposit = estimates.includeSecurityDeposit;
+  const housingFees = input.needsHousing ? estimates.housingFees : 0;
   const securityDeposit = includeSecurityDeposit ? monthlyRent : 0;
   const housingUpfront = monthlyRent + securityDeposit + housingFees;
-  const travel =
-    input.transport === "fly"
-      ? (input.adults + input.children) * 280 + input.pets * 180
-      : input.scenario === "family"
-        ? 520
-        : 180;
-  const moving = input.furniture
-    ? input.scenario === "family"
-      ? 1800
-      : 950
-    : 0;
-  const supplies = input.furniture
-    ? input.scenario === "family"
-      ? 420
-      : 180
-    : 40;
-  const pet = input.pets * 180;
-  const transportation = estimates?.transportation ?? travel;
-  const movingAllowance = input.furniture ? (estimates?.moving ?? moving) : 0;
-  const additional = estimates?.additional ?? supplies + pet;
-  const temporaryAccommodation = estimates?.temporaryAccommodation ?? 0;
+  const transportation = estimates.transportation;
+  const movingAllowance = input.furniture ? estimates.moving : 0;
+  const additional = estimates.additional;
+  const temporaryAccommodation = estimates.temporaryAccommodation;
   const base = Math.round(
     housingUpfront +
       transportation +
@@ -212,16 +210,16 @@ export function calculateBudget(
   );
   return {
     budget: input.budget,
-    minimal: Math.round(base * 0.78),
+    minimal: Math.round(housingUpfront + estimates.minimalNonHousing),
     recommended: base,
-    fullService: Math.round(base * 1.35),
+    fullService: Math.round(housingUpfront + estimates.fullServiceNonHousing),
     housingUpfront,
     monthlyRent,
     securityDeposit,
     includeSecurityDeposit,
     housingFees,
     temporaryAccommodation,
-    estimateSource: estimates?.source ?? ("planning_rules" as const),
+    estimateSource: estimates.source,
     transportation,
     moving: movingAllowance,
     additional,
@@ -229,26 +227,6 @@ export function calculateBudget(
   };
 }
 
-export const demoAlone: RelocationInput = {
-  scenario: "alone",
-  origin: "Boston, MA",
-  destination: "New York, NY",
-  movingDate: "2026-11-15",
-  flexible: true,
-  budget: 3000,
-  adults: 1,
-  children: 0,
-  pets: 0,
-  bedrooms: 1,
-  suitcases: 2,
-  furniture: false,
-  transport: "compare",
-  needsHousing: true,
-  maxRent: 2600,
-  minBedrooms: 1,
-  petFriendly: false,
-  neighborhood: "",
-};
 export const demoFamily: RelocationInput = {
   scenario: "family",
   origin: "Boston, MA",

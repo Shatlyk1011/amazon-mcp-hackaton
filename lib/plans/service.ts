@@ -8,6 +8,10 @@ import {
 import { generatePlan } from "./generate";
 import { getPlan, savePlan, markGenerationFailed } from "./repository";
 import { PlanError } from "./errors";
+import {
+  invalidateMovingEstimates,
+  withMovingEstimates,
+} from "@/lib/intake/estimate-expenses";
 
 export const changesSchema = relocationInputSchema.partial().strict();
 export const selectionSchema = z
@@ -27,6 +31,14 @@ export async function regeneratePlan(
   const input = relocationInputSchema.parse({
     ...plan.input,
     ...changesSchema.parse(changes),
+    ...(Object.keys(changes).some((key) => key !== "expenseEstimates") &&
+    changes.expenseEstimates === undefined
+      ? {
+          expenseEstimates: invalidateMovingEstimates(
+            plan.input.expenseEstimates,
+          ),
+        }
+      : {}),
   });
   try {
     const result = await generatePlan(input, {
@@ -37,7 +49,7 @@ export async function regeneratePlan(
       plan,
       owner,
       token,
-      input,
+      result.input,
       result,
       plan.result ? "Updated requirements and results" : "Initial generation",
     );
@@ -70,17 +82,19 @@ export async function updateSelection(
     throw new PlanError("That housing option is not in this plan.");
   if (moverId && !plan.result.movers.some((item) => item.id === moverId))
     throw new PlanError("That moving service is not in this plan.");
+  const input = await withMovingEstimates(plan.input);
   return savePlan(
     plan,
     owner,
     token,
-    plan.input,
+    input,
     {
       ...plan.result,
+      input,
       selectedHousingId: housingId,
       selectedMoverId: moverId,
-      budget: calculateBudget(plan.input, housing),
-      recommendations: recommendations(plan.input),
+      budget: calculateBudget(input, housing),
+      recommendations: recommendations(input),
     },
     "Updated selections",
   );

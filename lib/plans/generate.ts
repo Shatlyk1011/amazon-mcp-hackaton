@@ -7,11 +7,13 @@ import {
 import { searchHousing } from "@/lib/providers/rentcast";
 import { searchFlightConnections } from "@/lib/providers/demo-flights";
 import { searchMovingServices } from "@/lib/providers/tomtom-search";
+import { withMovingEstimates } from "@/lib/intake/estimate-expenses";
 
 export async function generatePlan(
   input: RelocationInput,
   selection: { housingId?: string | null; moverId?: string | null } = {},
 ) {
+  input = await withMovingEstimates(input);
   const start = Date.now();
   const [route, housingResult, flightSchedules] = await Promise.all([
     input.transport === "fly" ? Promise.resolve(null) : calculateRoute(input),

@@ -13,6 +13,11 @@ export const movingEstimatesSchema = z
     additional: amount.optional(),
     housingFees: amount.optional(),
     includeSecurityDeposit: z.boolean().optional(),
+    minimalNonHousing: amount.optional(),
+    fullServiceNonHousing: amount.optional(),
+    cheapestStrategy: amount.optional(),
+    recommendedStrategy: amount.optional(),
+    comfortableStrategy: amount.optional(),
   })
   .strict();
 

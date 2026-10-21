@@ -6,8 +6,11 @@ vi.mock("openai", () => ({
     responses = { parse };
   },
 }));
-import { estimateMovingExpenses } from "@/lib/intake/estimate-expenses";
-import { calculateBudget, demoFamily } from "@/lib/relocation";
+import {
+  estimateMovingExpenses,
+  withMovingEstimates,
+} from "@/lib/intake/estimate-expenses";
+import { calculateBudget, demoFamily, recommendations } from "@/lib/relocation";
 
 const amounts = {
   monthlyRent: 1700,
@@ -17,6 +20,11 @@ const amounts = {
   additional: 625,
   housingFees: 0,
   includeSecurityDeposit: true,
+  minimalNonHousing: 1500,
+  fullServiceNonHousing: 4000,
+  cheapestStrategy: 800,
+  recommendedStrategy: 1250,
+  comfortableStrategy: 2500,
 };
 beforeEach(() => {
   vi.stubEnv("OPENAI_API_KEY", "fixture");
@@ -63,6 +71,30 @@ describe("initial GPT expense estimates", () => {
     expect(budget.housingUpfront).toBe(0);
     expect(budget.moving).toBe(0);
     expect(budget.recommended).toBe(1325);
+  });
+  it("uses model scenarios and preserves user-entered amounts", async () => {
+    parse.mockResolvedValue({ output_parsed: amounts });
+    const input = await withMovingEstimates({
+      ...demoFamily,
+      expenseEstimates: { source: "user", transportation: 777 },
+    });
+    expect(input.expenseEstimates).toMatchObject({
+      source: "user",
+      transportation: 777,
+    });
+    expect(recommendations(input).map((item) => item.cost)).toEqual([
+      800, 1250, 2500,
+    ]);
+    expect(calculateBudget(input).minimal).toBe(4900);
+    expect(calculateBudget(input).fullService).toBe(7400);
+    await withMovingEstimates(input);
+    expect(parse).toHaveBeenCalledOnce();
+  });
+  it("reports unavailable estimates instead of inventing a fixed fallback", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "");
+    await expect(withMovingEstimates(demoFamily)).rejects.toThrow(
+      "Moving estimates are unavailable",
+    );
   });
   it("falls back without a key, on errors, refusals, or invalid amounts", async () => {
     vi.stubEnv("OPENAI_API_KEY", "");

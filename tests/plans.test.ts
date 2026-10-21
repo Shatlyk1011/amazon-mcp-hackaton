@@ -17,6 +17,7 @@ import {
 import type OpenAI from "openai";
 import { demoFamily, calculateBudget, recommendations } from "@/lib/relocation";
 import type { PlanResult, PlanRequest } from "@/lib/plans/types";
+import { testExpenseEstimates } from "./fixtures/estimates";
 
 vi.mock("server-only", () => ({}));
 const state = vi.hoisted(() => ({ sql: undefined as unknown }));
@@ -52,6 +53,10 @@ import {
 
 const db = new PGlite();
 function fixture(input = demoFamily): PlanResult {
+  input = {
+    ...input,
+    expenseEstimates: { ...testExpenseEstimates, ...input.expenseEstimates },
+  };
   return {
     input,
     route: {

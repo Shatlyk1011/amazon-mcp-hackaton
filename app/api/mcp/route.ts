@@ -3,6 +3,7 @@ import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
 import { usCitySchema } from "@/lib/us-location";
 import { registerIntakeTools } from "@/lib/intake/mcp";
+import { withMovingEstimates } from "@/lib/intake/estimate-expenses";
 import {
   calculateBudget,
   calculateRoute,
@@ -151,7 +152,7 @@ const publicMcpHandler = createMcpHandler((server) => {
     "calculate_budget",
     {
       description:
-        "Calculate deterministic relocation costs and budget scenarios. An optional explicit housing selection can be supplied from any listing source.",
+        "Calculate relocation costs using supplied or OpenAI-generated estimates. An optional explicit housing selection can be supplied from any listing source.",
       inputSchema: relocationInputSchema.extend({
         selection: previewSelectionSchema.optional(),
       }),
@@ -162,7 +163,10 @@ const publicMcpHandler = createMcpHandler((server) => {
         {
           type: "text",
           text: JSON.stringify(
-            calculateBudget(input, input.selection?.housing),
+            calculateBudget(
+              await withMovingEstimates(input),
+              input.selection?.housing,
+            ),
           ),
         },
       ],
@@ -188,7 +192,10 @@ const publicMcpHandler = createMcpHandler((server) => {
                 housingId: input.selection.housing?.id,
                 moverId: input.selection.moverId,
               },
-              budget: calculateBudget(input, input.selection.housing),
+              budget: calculateBudget(
+                await withMovingEstimates(input),
+                input.selection.housing,
+              ),
               persisted: false,
             }),
           },
@@ -225,7 +232,15 @@ const publicMcpHandler = createMcpHandler((server) => {
     },
     async (input) => ({
       content: [
-        { type: "text", text: JSON.stringify(assessMoveReadiness(input)) },
+        {
+          type: "text",
+          text: JSON.stringify(
+            assessMoveReadiness({
+              ...input,
+              input: await withMovingEstimates(input.input),
+            }),
+          ),
+        },
       ],
     }),
   );
@@ -272,7 +287,7 @@ const publicMcpHandler = createMcpHandler((server) => {
     "create_move_briefing",
     {
       description:
-        "Create a concise, deterministic move briefing from an explicit readiness snapshot. Does not call a language model or read saved state.",
+        "Create a concise move briefing from an explicit readiness snapshot. Missing estimates are generated with OpenAI; does not read saved state.",
       inputSchema: readinessSnapshotSchema.extend({
         referenceDate: z.iso.date().optional(),
       }),
@@ -282,7 +297,12 @@ const publicMcpHandler = createMcpHandler((server) => {
       content: [
         {
           type: "text",
-          text: JSON.stringify(createMoveBriefing(snapshot, referenceDate)),
+          text: JSON.stringify(
+            createMoveBriefing(
+              { ...snapshot, input: await withMovingEstimates(snapshot.input) },
+              referenceDate,
+            ),
+          ),
         },
       ],
     }),
