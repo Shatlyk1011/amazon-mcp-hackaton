@@ -21,6 +21,8 @@ describe("simulated flight examples", () => {
       expect(result.connections[0]?.segments[0]).toMatchObject({
         originAirport: input.origin,
         destinationAirport: input.destination,
+        departureTime: "8:30 AM",
+        arrivalTime: "11:30 AM",
       });
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {

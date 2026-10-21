@@ -1,7 +1,8 @@
 import { resultRenderer, resultStyles } from "./result-app";
+import { planEditorRenderer, planEditorStyles } from "./plan-editor";
 
-export const quizResourceUri = "ui://moveflow/quiz-v2.html";
-export const resultResourceUri = "ui://moveflow/plan-v1.html";
+export const quizResourceUri = "ui://moveflow/quiz-v3.html";
+export const resultResourceUri = "ui://moveflow/plan-v2.html";
 
 // A self-contained resource lets MCP Apps hosts render it without fetching assets.
 export const quizHtml = String.raw`<!doctype html>
@@ -10,11 +11,12 @@ export const quizHtml = String.raw`<!doctype html>
 :root{color-scheme:light dark;font-family:system-ui,sans-serif;color:var(--color-text-primary,CanvasText);background:var(--color-background-primary,Canvas)}
 *{box-sizing:border-box}body{margin:0;padding:16px}main{max-width:540px;margin:auto}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.65}h1{font-size:22px;line-height:1.25;margin:10px 0}p{line-height:1.45;opacity:.78;margin:0 0 16px}fieldset{border:0;padding:0;margin:0;display:grid;gap:8px}legend{font-weight:600;margin-bottom:10px}.option{display:flex;align-items:center;gap:12px;border:1px solid color-mix(in srgb,CanvasText 22%,transparent);border-radius:12px;padding:12px;cursor:pointer}.option:has(input:checked){border-color:#3275b8;background:color-mix(in srgb,#3275b8 12%,Canvas)}input[type=radio]{accent-color:#3275b8;width:18px;height:18px;margin:0;flex:none}label.text-label{display:block;font-weight:600;font-size:14px;margin:16px 0 8px}textarea,input.entry{font:inherit;color:inherit;background:transparent;border:1px solid color-mix(in srgb,CanvasText 30%,transparent);border-radius:10px;padding:10px;width:100%}textarea{resize:vertical;min-height:72px}button{font:inherit;font-weight:650;border:0;border-radius:10px;background:#286aa8;color:white;padding:11px 18px;margin-top:16px;cursor:pointer}button:disabled{opacity:.5;cursor:wait}:focus-visible{outline:3px solid #6ba6e0;outline-offset:2px}.error{color:#c63636;opacity:1;margin-top:12px}.summary{white-space:pre-wrap}
 ${resultStyles}
+${planEditorStyles}
 </style></head><body><main><div class="eyebrow">MoveFlow</div><div id="app" role="region" aria-live="polite"><h1>Preparing your move…</h1></div></main>
 <script>
 (() => {
   const root = document.getElementById('app');
-  let view, busy = false, nextId = 0;
+  let view, busy = false, nextId = 0, currentPlanMeta;
   const pending = new Map();
   const notify = (method, params) => parent.postMessage({jsonrpc:'2.0',method,params}, '*');
   const request = (method, params) => new Promise((resolve,reject) => {
@@ -33,6 +35,7 @@ ${resultStyles}
   window.addEventListener('resize',resize);
   root.addEventListener('toggle',resize,true);
   function showError(message) { let el=root.querySelector('.error'); if(!el){el=element('p','','error');el.setAttribute('role','alert');root.append(el)} el.textContent=message; resize(); }
+${planEditorRenderer}
 ${resultRenderer}
   function update(result) {
     if(result && result.isError) throw new Error(result.content?.[0]?.text || 'Could not save your answer.');

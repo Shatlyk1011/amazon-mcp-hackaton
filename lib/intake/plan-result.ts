@@ -197,6 +197,7 @@ export function buildPlanPresentation(result: PlanResult, state: IntakeState) {
   const plan = {
     status: "ready" as const,
     persisted: false,
+    state,
     generatedAt: result.generatedAt,
     move: {
       origin: input.origin,
@@ -262,12 +263,28 @@ export function buildPlanPresentation(result: PlanResult, state: IntakeState) {
         sourceUrl: safeSourceUrl(mover.website),
       })),
     },
-    flights: {
-      status: "unavailable" as const,
-      source: "Simulated flight examples",
-      warning:
-        "Live flight schedules and fares are not connected. Fictional flight examples are omitted; compare actual flights with an airline before booking.",
-    },
+    flights: result.flightSchedules
+      ? {
+          status: result.flightSchedules.status,
+          source: short(result.flightSchedules.source),
+          departureDate: result.flightSchedules.departureDate,
+          isDemoData: result.flightSchedules.isDemoData ?? false,
+          connections: result.flightSchedules.connections
+            .slice(0, 4)
+            .map((connection) => ({
+              id: short(connection.id, 100),
+              stops: connection.stops,
+              segments: connection.segments.slice(0, 2).map((segment) => ({
+                airline: short(segment.airline, 100),
+                flightNumber: short(segment.flightNumber, 50),
+                originAirport: short(segment.originAirport, 150),
+                destinationAirport: short(segment.destinationAirport, 150),
+                departureTime: short(segment.departureTime, 50),
+                arrivalTime: short(segment.arrivalTime, 50),
+              })),
+            })),
+        }
+      : null,
     budget: result.budget,
     strategies: result.recommendations.slice(0, 3),
     timeline: buildMoveTimeline(input),
@@ -284,10 +301,14 @@ export function movePlanText(plan: MovePlanPresentation) {
   return [
     `MoveFlow moving plan: ${plan.move.origin} → ${plan.move.destination}`,
     `Move date: ${plan.move.movingDate}. ${plan.briefing.summary}`,
-    plan.route.status === "live"
-      ? `Driving route: ${plan.route.distanceMiles} miles, about ${plan.route.durationHours} hours (${plan.route.source}).`
-      : plan.route.warning,
-    `Budget: ${dollars(plan.budget.recommended)} recommended allowance; ${dollars(plan.budget.budget)} available; ${plan.budget.remaining < 0 ? `${dollars(Math.abs(plan.budget.remaining))} gap` : `${dollars(plan.budget.remaining)} remaining`}. Housing upfront ${dollars(plan.budget.housingUpfront)}, travel ${dollars(plan.budget.transportation)}, moving ${dollars(plan.budget.moving)}, other ${dollars(plan.budget.additional)}. Estimates, not quotes.`,
+    ...(plan.move.transport === "fly"
+      ? []
+      : [
+          plan.route.status === "live"
+            ? `Driving route: ${plan.route.distanceMiles} miles, about ${plan.route.durationHours} hours (${plan.route.source}).`
+            : plan.route.warning,
+        ]),
+    `Budget: ${dollars(plan.budget.recommended)} recommended allowance; ${dollars(plan.budget.budget)} available; ${plan.budget.remaining < 0 ? `${dollars(Math.abs(plan.budget.remaining))} gap` : `${dollars(plan.budget.remaining)} remaining`}. Housing upfront ${dollars(plan.budget.housingUpfront)}, travel ${dollars(plan.budget.transportation)}, moving ${dollars(plan.budget.moving)}, temporary accommodation ${dollars(plan.budget.temporaryAccommodation)}, other ${dollars(plan.budget.additional)}. Source: ${plan.budget.estimateSource === "model" ? "GPT planning estimates" : plan.budget.estimateSource === "user" ? "User-adjusted planning estimates" : "MoveFlow planning rules"}. Estimates, not quotes or verified market averages.`,
     plan.move.needsHousing
       ? `Housing: ${plan.housing.totalMatches} live options within ${dollars(plan.move.maxRent)}/month and at least ${plan.move.minBedrooms} bedrooms. ${plan.housing.excludedCount} sample or out-of-criteria results excluded.`
       : "Housing is already arranged; rental search was not requested.",
@@ -299,11 +320,23 @@ export function movePlanText(plan: MovePlanPresentation) {
       ),
     `Housing source: ${plan.housing.source} (${plan.housing.status}), checked ${plan.housing.fetchedAt}. ${plan.housing.warning}`,
     `Moving services: ${plan.movers.totalOptions} live options. Source: ${plan.movers.source} (${plan.movers.status}). ${plan.movers.warning}`,
-    plan.flights.warning,
+    ...(plan.flights
+      ? [
+          `Flight examples for ${plan.move.origin} → ${plan.move.destination} on ${plan.flights.departureDate} (${plan.flights.source}${plan.flights.isDemoData ? "; fictional demo schedules" : ""}):`,
+          ...plan.flights.connections.map((connection) =>
+            connection.segments
+              .map(
+                (segment) =>
+                  `${segment.airline} ${segment.flightNumber}: ${segment.originAirport} ${segment.departureTime} → ${segment.destinationAirport} ${segment.arrivalTime}`,
+              )
+              .join("; "),
+          ),
+        ]
+      : []),
     `Next action: ${plan.readiness.nextAction}`,
     ...plan.timeline.timeline.map((task) => `${task.dueDate}: ${task.title}`),
     ...plan.assumptions,
-    "The MoveFlow app displays the map, comparison tables, and provider limitations. This plan has not been saved to an account.",
+    "Edit the expenses or move preferences in the app and select Update my relocation plan to refresh. This plan has not been saved to an account.",
   ]
     .filter(Boolean)
     .join("\n");

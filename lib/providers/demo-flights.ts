@@ -51,6 +51,8 @@ export async function searchFlightConnections(input: {
             airline: "Example airline",
             originAirport: input.origin,
             destinationAirport: input.destination,
+            departureTime: "8:30 AM",
+            arrivalTime: "11:30 AM",
           },
         ],
       },
@@ -65,13 +67,17 @@ export async function searchFlightConnections(input: {
                   flightNumber: "DEMO 201",
                   airline: "Example airline",
                   originAirport: input.origin,
-                  destinationAirport: "Example transfer point",
+                  destinationAirport: "Example transfer city",
+                  departureTime: "10:00 AM",
+                  arrivalTime: "12:00 PM",
                 },
                 {
                   flightNumber: "DEMO 202",
                   airline: "Example airline",
-                  originAirport: "Example transfer point",
+                  originAirport: "Example transfer city",
                   destinationAirport: input.destination,
+                  departureTime: "1:30 PM",
+                  arrivalTime: "3:30 PM",
                 },
               ],
             },
@@ -81,7 +87,6 @@ export async function searchFlightConnections(input: {
     status: "fallback",
     isDemoData: true,
     fetchedAt: new Date().toISOString(),
-    warning:
-      "These are fictional flight examples, not real airlines, routes, schedules, fares, or booking availability. Confirm actual travel options with an airline.",
+    warning: "Demo schedules only; flights and availability are fictional.",
   };
 }

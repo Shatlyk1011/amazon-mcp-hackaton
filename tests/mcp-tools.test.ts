@@ -40,6 +40,21 @@ async function connectPublic() {
   return client;
 }
 
+describe("relocation tool discovery metadata", () => {
+  it("describes natural relocation requests and excludes ordinary trips", async () => {
+    const client = await connectPublic();
+    try {
+      const { tools } = await client.listTools();
+      const intake = tools.find((tool) => tool.name === "prepare_move_intake");
+      expect(intake?.description).toContain("moving from Boston to Austin");
+      expect(intake?.description).toContain("simple trip or flight search");
+      expect(intake?.description).toContain("never invent");
+    } finally {
+      await client.close();
+    }
+  });
+});
+
 const standaloneCalls: {
   name: string;
   arguments: Record<string, unknown>;
@@ -60,6 +75,14 @@ const standaloneCalls: {
     arguments: { cities: ["Austin, TX", "Dallas, TX"], bedrooms: 2 },
   },
   { name: "generate_move_plan", arguments: { state: fullState } },
+  {
+    name: "update_move_plan",
+    arguments: {
+      state: fullState,
+      changes: { transport: "fly" },
+      estimates: { source: "user", transportation: 600 },
+    },
+  },
   { name: "draft_relocation_plan", arguments: demoFamily },
   {
     name: "calculate_route",
@@ -217,10 +240,10 @@ describe("public MCP standalone contracts", () => {
         (tool) => tool.name === "prepare_move_intake",
       );
       expect(prepare?._meta?.ui).toEqual({
-        resourceUri: "ui://moveflow/quiz-v2.html",
+        resourceUri: "ui://moveflow/quiz-v3.html",
       });
       const resource = await client.readResource({
-        uri: "ui://moveflow/quiz-v2.html",
+        uri: "ui://moveflow/quiz-v3.html",
       });
       expect(resource.contents[0]).toMatchObject({
         mimeType: "text/html;profile=mcp-app",

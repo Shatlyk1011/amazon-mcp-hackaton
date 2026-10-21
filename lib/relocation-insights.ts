@@ -155,10 +155,16 @@ export function assessMoveReadiness(raw: ReadinessSnapshot) {
   const checks = [
     {
       id: "route",
-      label: "Route understood",
-      ready: snapshot.routeAvailable,
+      label:
+        snapshot.input.transport === "fly"
+          ? "Travel method chosen"
+          : "Route understood",
+      ready: snapshot.input.transport === "fly" || snapshot.routeAvailable,
       weight: 15,
-      action: "Calculate the route and travel time.",
+      action:
+        snapshot.input.transport === "fly"
+          ? "Confirm flights and arrival details."
+          : "Calculate the route and travel time.",
     },
     {
       id: "housing-options",
