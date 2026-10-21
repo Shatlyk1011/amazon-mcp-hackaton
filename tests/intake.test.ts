@@ -18,6 +18,7 @@ import {
 } from "@/lib/intake/service";
 import { searchHousing } from "@/lib/providers/rentcast";
 import { extractRelocationDetails } from "@/lib/plans/prompt";
+import { PlanError } from "@/lib/plans/errors";
 import type { IntakeFields } from "@/lib/intake/schema";
 import { testExpenseEstimates } from "./fixtures/estimates";
 const now = new Date("2026-10-18T12:00:00Z");
@@ -202,6 +203,31 @@ describe("shared UI and MCP move intake", () => {
     const view = await prepareIntake("", full);
     expect(view.ready).toBe(true);
     expect(extractRelocationDetails).not.toHaveBeenCalled();
+  });
+  it("continues with explicit fields and a warning when extraction fails", async () => {
+    vi.mocked(extractRelocationDetails).mockRejectedValueOnce(
+      new PlanError("unavailable", 503),
+    );
+    const view = await prepareIntake("Moving from Chicago to Boston", {
+      origin: "Chicago, IL",
+      destination: "Boston, MA",
+    });
+    expect(view.state.fields).toMatchObject({
+      origin: "Chicago, IL",
+      destination: "Boston, MA",
+    });
+    expect(view.state.prompt).toBe("Moving from Chicago to Boston");
+    expect(view.nextQuestion?.id).toBe("household");
+    expect("extractionWarning" in view && view.extractionWarning).toBeTruthy();
+  });
+  it("prefers explicit structured fields over conflicting extracted fields", async () => {
+    vi.mocked(extractRelocationDetails).mockResolvedValueOnce({
+      origin: "Austin, TX",
+    });
+    const view = await prepareIntake("Moving from Chicago", {
+      origin: "Chicago, IL",
+    });
+    expect(view.state.fields.origin).toBe("Chicago, IL");
   });
   it("never derives local prices from demo data", async () => {
     vi.mocked(searchHousing).mockResolvedValue({

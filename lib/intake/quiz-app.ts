@@ -51,7 +51,7 @@ ${resultRenderer}
       const button=element('button','Build my moving plan'); root.append(button);
       button.onclick=async()=>{if(busy)return;busy=true;button.disabled=true;button.textContent='Building your plan…';root.querySelector('.error')?.remove();try{
         update(await request('tools/call',{name:'generate_move_plan',arguments:{state:view.state}}));
-      }catch(e){button.disabled=false;button.textContent='Retry building my plan';showError(e?.message||'The plan could not be built. Retry using your saved answers.');}finally{busy=false;}};
+      }catch(e){button.disabled=false;button.textContent='Retry building my plan';showError('The plan could not be built. Your answers are still here; please try again.');}finally{busy=false;}};
       resize(); return;
     }
     const q=view.nextQuestion; if(!q){showError('No question is available. Continue in the conversation.');return;}

@@ -81,9 +81,27 @@ export async function prepareIntake(
   known: IntakeFields = {},
   context: IntakeFields = {},
 ) {
-  const extracted = prompt ? await extractRelocationDetails(prompt) : {};
+  let extracted: IntakeFields = {};
+  let extractionFailed = false;
+  if (prompt) {
+    try {
+      extracted = await extractRelocationDetails(prompt);
+    } catch (error) {
+      if (!(error instanceof PlanError)) throw error;
+      extractionFailed = true;
+    }
+  }
   // A new, explicit request wins over saved context, including typed structured values.
-  return enrichIntake(beginIntake({ ...known, ...extracted }, context, prompt));
+  const view = await enrichIntake(
+    beginIntake({ ...extracted, ...known }, context, prompt),
+  );
+  return extractionFailed
+    ? {
+        ...view,
+        extractionWarning:
+          "The request text could not be interpreted automatically. Review the captured details and provide any missing information during the intake.",
+      }
+    : view;
 }
 
 const questionFields: Record<string, (keyof IntakeFields)[]> = {
