@@ -7,7 +7,36 @@ const states = Object.entries(groupCitiesByState()).map(([abbr, cities]) => ({
   abbr: abbr.toLowerCase(),
   name: cities[0]?.state.toLowerCase(),
   cities: new Set(cities.map((city) => city.name.toLowerCase())),
+  cityNames: new Map(
+    cities.map((city) => [city.name.toLowerCase(), city.name]),
+  ),
 }));
+
+// Provider queries require postal state codes even when intake uses full names.
+export function parseUsCityLocation(value: string) {
+  const parts = value
+    .trim()
+    .split(",")
+    .map((part) => part.trim());
+  if (
+    /^(usa|us|u\.s\.a\.|u\.s\.|united states|united states of america)$/i.test(
+      parts.at(-1) ?? "",
+    )
+  )
+    parts.pop();
+  const city = parts[0] ?? "";
+  const state = parts[1]?.toLowerCase();
+  const matches = states.filter((candidate) =>
+    state
+      ? candidate.abbr === state || candidate.name === state
+      : candidate.cities.has(city.toLowerCase()),
+  );
+  const match = matches.length === 1 ? matches[0] : undefined;
+  return {
+    city: match?.cityNames.get(city.toLowerCase()) ?? city,
+    state: match?.abbr.toUpperCase(),
+  };
+}
 
 export function isUsLocation(value: string, allowState = false): boolean {
   const parts = value

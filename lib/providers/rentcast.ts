@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DEMO_HOUSES } from "@/data";
 import { housingListingUrl, type Housing } from "@/lib/relocation";
+import { parseUsCityLocation } from "@/lib/us-location";
 
 const rentCastListingSchema = z.record(z.string(), z.unknown());
 
@@ -23,14 +24,6 @@ export type HousingSearchResult = {
 
 function browseUrl(destination: string) {
   return `https://www.zillow.com/homes/for_rent/${encodeURIComponent(destination)}/`;
-}
-
-function parseDestination(destination: string) {
-  const match = destination.trim().match(/^(.*?)(?:,\s*([A-Za-z]{2}))?$/);
-  return {
-    city: match?.[1]?.trim() ?? destination.trim(),
-    state: match?.[2]?.toUpperCase(),
-  };
 }
 
 function toNumber(value: unknown) {
@@ -100,35 +93,39 @@ export async function searchHousing(
 ): Promise<HousingSearchResult> {
   const fetchedAt = new Date().toISOString();
   const token = process.env.RENTCAST_API_KEY;
-  const useDevelopmentData =
-    !input.liveOnly && process.env.NODE_ENV !== "production";
-  if (useDevelopmentData || !token) {
+  if (!token) {
     return {
-      listings: input.liveOnly ? [] : DEMO_HOUSES,
-      source: input.liveOnly ? "RentCast" : "RentCast · development response",
+      listings: input.liveOnly
+        ? []
+        : DEMO_HOUSES.map((home) => ({
+            ...home,
+            isDemoData: true,
+            availability: "Unknown" as const,
+            source: "Saved RentCast snapshot",
+          })),
+      source: input.liveOnly
+        ? "RentCast"
+        : "RentCast · saved snapshot (development data)",
       status: "unavailable",
       fetchedAt,
       warning: input.liveOnly
         ? "Live rental guidance requires RENTCAST_API_KEY."
-        : useDevelopmentData
-          ? "Using the development response from data.ts"
-          : "RENTCAST_API_KEY is not configured; showing the development response from data.ts",
+        : "Live rental search is not configured. Saved rental examples are available, but their locations and availability may not match your move.",
       browseUrl: browseUrl(input.destination),
     };
   }
 
-  const destination = parseDestination(input.destination);
+  const destination = parseUsCityLocation(input.destination);
   const params = new URLSearchParams({
     status: "Active",
     limit: "50",
   });
   if (destination.city) params.set("city", destination.city);
   if (destination.state) params.set("state", destination.state);
-  if (input.maxRent !== undefined)
-    params.set("maxPrice", String(input.maxRent));
+  if (input.maxRent !== undefined) params.set("price", `0:${input.maxRent}`);
   if (input.bedrooms !== undefined)
-    params.set("bedrooms", String(input.bedrooms));
-  if (input.petFriendly) params.set("petsAllowed", "true");
+    params.set("bedrooms", `${input.bedrooms}:`);
+  // RentCast has no documented pet-policy filter; confirm it with the provider.
 
   try {
     const response = await fetch(
