@@ -508,6 +508,8 @@ class TestNode {
   value = "";
   checked = false;
   id = "";
+  type = "";
+  hidden = false;
   oninput?: () => void;
   onchange?: () => void;
   onclick?: () => Promise<void>;
@@ -593,6 +595,90 @@ function appHarness() {
 }
 
 describe("shipped app bridge", () => {
+  it("preserves custom household counts and selects the saved radio preferences", async () => {
+    const { payload } = await resultFixture();
+    const plan = payload.structuredContent;
+    const app = appHarness();
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: payload,
+    });
+    expect(app.root.querySelector("select")).toBeNull();
+    expect(
+      app.root.querySelector("#preference-household-family")!.checked,
+    ).toBe(true);
+    expect(app.root.querySelector(".household-counts")!.hidden).toBe(false);
+    expect(app.root.querySelector("#preference-adults")!.value).toBe(
+      String(plan.move.adults),
+    );
+    expect(app.root.querySelector("#preference-children")!.value).toBe(
+      String(plan.move.children),
+    );
+    for (const key of ["furniture", "needsHousing", "transport"] as const) {
+      const selected = app.root.querySelector(
+        `#preference-${key}-${plan.move[key]}`,
+      )!;
+      expect(selected.type).toBe("radio");
+      expect(selected.checked).toBe(true);
+    }
+    const submitting = app.root.querySelector("form")!.onsubmit!({
+      preventDefault() {},
+    });
+    const call = app.messages.find(
+      (message) => message.method === "tools/call",
+    )!;
+    expect(call.params).toMatchObject({ arguments: { changes: {} } });
+    app.send({
+      jsonrpc: "2.0",
+      id: call.id,
+      error: { message: "Test finished" },
+    });
+    await submitting;
+  });
+  it("submits household presets and boolean radio choices through the existing update tool", async () => {
+    const { payload } = await resultFixture();
+    const app = appHarness();
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: payload,
+    });
+    for (const id of [
+      "household-solo",
+      "furniture-false",
+      "needsHousing-false",
+    ]) {
+      const radio = app.root.querySelector(`#preference-${id}`)!;
+      radio.checked = true;
+      radio.onchange!();
+    }
+    expect(app.root.querySelector(".household-counts")!.hidden).toBe(true);
+    expect(app.root.querySelector("#cost-monthlyRent")!.disabled).toBe(true);
+    const submitting = app.root.querySelector("form")!.onsubmit!({
+      preventDefault() {},
+    });
+    const call = app.messages.find(
+      (message) => message.method === "tools/call",
+    )!;
+    expect(call.params).toMatchObject({
+      name: "update_move_plan",
+      arguments: {
+        changes: {
+          adults: 1,
+          children: 0,
+          furniture: false,
+          needsHousing: false,
+        },
+      },
+    });
+    app.send({
+      jsonrpc: "2.0",
+      id: call.id,
+      error: { message: "Test finished" },
+    });
+    await submitting;
+  });
   it("updates the embedded plan and future model context without posting into chat", async () => {
     const { payload } = await resultFixture();
     const app = appHarness();
@@ -604,7 +690,9 @@ describe("shipped app bridge", () => {
     const travel = app.root.querySelector("#cost-transportation")!;
     travel.value = "1234";
     travel.oninput!();
-    app.root.querySelector("#preference-transport")!.value = "fly";
+    const flight = app.root.querySelector("#preference-transport-fly")!;
+    flight.checked = true;
+    flight.onchange!();
     const submitting = app.root.querySelector("form")!.onsubmit!({
       preventDefault() {},
     });
@@ -684,13 +772,15 @@ describe("shipped app bridge", () => {
     const app = appHarness();
     app.resize(600);
     app.resize(600);
+    app.resize(600.25);
+    app.resize(600.25);
     app.resize(900);
     app.resize(400);
     expect(
       app.messages
         .filter((m) => m.method === "ui/notifications/size-changed")
         .map((m) => m.params.height),
-    ).toEqual([600, 900, 400]);
+    ).toEqual([602, 603, 902, 402]);
   });
   it("builds in the widget and renders the same result as direct tool calls", async () => {
     const { payload } = await resultFixture();
@@ -709,7 +799,8 @@ describe("shipped app bridge", () => {
     app.send({ jsonrpc: "2.0", id: request.id, result: payload });
     await building;
     expect(app.root.text).toContain("Homes to compare");
-    expect(app.root.text).toContain("Your timeline");
+    expect(app.root.text).toContain("Moving budget");
+    expect(app.root.text).not.toContain("Your timeline");
     expect(app.root.text).toContain("Flight options");
     expect(app.root.text).toContain("DEMO 101");
     expect(app.root.text).toContain("Demo data");

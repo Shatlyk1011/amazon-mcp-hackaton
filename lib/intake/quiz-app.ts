@@ -28,7 +28,8 @@ ${planEditorStyles}
   function element(tag, text, className) { const el=document.createElement(tag); if(text) el.textContent=text; if(className) el.className=className; return el; }
   let lastHeight=0;
   function resize() {
-    const height=Math.ceil(document.body.getBoundingClientRect().height);
+    // Leave room for fractional pixel rounding in the host's iframe sizing.
+    const height=Math.ceil(document.body.getBoundingClientRect().height)+2;
     if(height>0&&height!==lastHeight){lastHeight=height;notify('ui/notifications/size-changed',{height});}
   }
   if(typeof ResizeObserver!=='undefined')new ResizeObserver(resize).observe(document.body);
@@ -46,7 +47,7 @@ ${resultRenderer}
   function render() {
     root.replaceChildren();
     if(view.ready){
-      root.append(element('h1','Your move setup is ready'),element('p','Build your moving plan to compare homes, review the budget, and follow your timeline here.'));
+      root.append(element('h1','Your move setup is ready'),element('p','Build your moving plan to compare homes, adjust the budget, and review your next steps here.'));
       const list=element('p',view.summary.map(f => f.field + ': ' + f.value).join('\n'),'summary'); root.append(list);
       const button=element('button','Build my moving plan'); root.append(button);
       button.onclick=async()=>{if(busy)return;busy=true;button.disabled=true;button.textContent='Building your plan…';root.querySelector('.error')?.remove();try{
