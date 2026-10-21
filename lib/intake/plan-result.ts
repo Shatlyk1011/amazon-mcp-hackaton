@@ -153,6 +153,19 @@ export async function buildHousingMap(result: PlanResult) {
   }
 }
 
+// Only the explicitly public browser token is sent to the widget.
+export function buildInteractiveMaps(result: PlanResult) {
+  const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+  if (!token || !token.startsWith("pk.")) return undefined;
+  const route = result.route?.status === "live" ? routePoints(result) : [];
+  const homes = matchingHomes(result).slice(0, MAX_OPTIONS).flatMap((home, index) =>
+    Number.isFinite(home.lng) && Number.isFinite(home.lat) && Math.abs(home.lng) <= 180 && Math.abs(home.lat) <= 85
+      ? [{ index, coordinates: [home.lng, home.lat] }]
+      : [],
+  );
+  return { token, route, homes };
+}
+
 export function buildPlanPresentation(result: PlanResult, state: IntakeState) {
   const { input } = result;
   const matching = matchingHomes(result);

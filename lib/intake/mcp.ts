@@ -9,6 +9,7 @@ import {
 } from "@/lib/moving-estimates";
 import {
   buildHousingMap,
+  buildInteractiveMaps,
   buildPlanMap,
   buildPlanPresentation,
   movePlanText,
@@ -73,7 +74,7 @@ async function generateMoveResult(
     return {
       content: [{ type: "text" as const, text: movePlanText(plan) }],
       structuredContent: plan,
-      _meta: { moveflow: { map, housingMap } },
+      _meta: { moveflow: { map, housingMap, interactive: buildInteractiveMaps(result) } },
     };
   } catch (error) {
     return {
@@ -139,7 +140,7 @@ export function registerIntakeTools(server: McpServer) {
             _meta: {
               "openai/widgetDescription":
                 "MoveFlow renders an editable moving plan: maps, housing, estimated expenses, preferences, timeline, and sources. The Update plan button refreshes this app in place without posting a chat message.",
-              ui: { csp: { connectDomains: [], resourceDomains: [] } },
+              ui: { csp: { connectDomains: [], resourceDomains: ["https://api.mapbox.com"] } },
             },
           },
         ],

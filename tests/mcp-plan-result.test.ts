@@ -33,6 +33,7 @@ import { demoFamily, type Housing } from "@/lib/relocation";
 import { beginIntake, completeIntake, intakeView } from "@/lib/intake/engine";
 import {
   buildHousingMap,
+  buildInteractiveMaps,
   buildPlanMap,
   buildPlanPresentation,
   movePlanText,
@@ -413,6 +414,20 @@ describe("MoveFlow final result", () => {
     expect(plan.housing.options).toHaveLength(8);
     expect(plan.housing.totalMatches).toBe(100);
     expect(plan.housing.options[0].sourceUrl).toBeUndefined();
+  });
+  it("sends bounded map coordinates only with an explicitly public browser token", async () => {
+    const { result } = await resultFixture();
+    vi.stubEnv("NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN", "");
+    vi.stubEnv("MAPBOX_ACCESS_TOKEN", "secret-server-token");
+    expect(buildInteractiveMaps(result)).toBeUndefined();
+    vi.stubEnv("NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN", "sk.secret");
+    expect(buildInteractiveMaps(result)).toBeUndefined();
+    vi.stubEnv("NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN", "pk.public-token");
+    const maps = buildInteractiveMaps(result)!;
+    expect(maps.token).toBe("pk.public-token");
+    expect(maps.route.length).toBeLessThanOrEqual(200);
+    expect(maps.homes).toEqual([{ index: 0, coordinates: [-73.9, 40.7] }]);
+    expect(JSON.stringify(maps)).not.toContain("secret-server-token");
   });
   it("keeps map credentials server-side, bounds routes, and handles map failures", async () => {
     const { result } = await resultFixture();
