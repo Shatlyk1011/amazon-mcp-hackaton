@@ -36,21 +36,42 @@ export default function Home() {
       });
     return () => controller.abort();
   }, []);
-  async function send(endpoint: string, payload: unknown, method = "POST") {
+  async function send(
+    endpoint: string,
+    payload: unknown,
+    method = "POST",
+    autoComplete = false,
+  ) {
     if (active.current) return;
     active.current = true;
     setPending(true);
     setError(undefined);
+    let currentIntake = intake;
     try {
-      const response = await fetch(endpoint, {
+      let response = await fetch(endpoint, {
         method,
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await response.json();
+      let data = await response.json();
+      if (response.ok && autoComplete && data.intake?.ready) {
+        const readyIntake: SavedIntakeView = data.intake;
+        currentIntake = readyIntake;
+        setIntake(readyIntake);
+        setResumable(undefined);
+        response = await fetch(`/api/intake/${readyIntake.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            action: "complete",
+            version: readyIntake.version,
+          }),
+        });
+        data = await response.json();
+      }
       if (!response.ok) {
-        if (response.status === 409 && intake) {
-          const latest = await fetch(`/api/intake/${intake.id}`, {
+        if (response.status === 409 && currentIntake) {
+          const latest = await fetch(`/api/intake/${currentIntake.id}`, {
             cache: "no-store",
           });
           if (latest.ok) setIntake((await latest.json()).intake);
@@ -85,13 +106,18 @@ export default function Home() {
     });
     if (attempt.current?.input !== input)
       attempt.current = { input, id: crypto.randomUUID() };
-    return send("/api/intake", {
-      prompt,
-      known,
-      includeContext,
-      context: includeContext ? moveContext : undefined,
-      requestId: attempt.current.id,
-    });
+    return send(
+      "/api/intake",
+      {
+        prompt,
+        known,
+        includeContext,
+        context: includeContext ? moveContext : undefined,
+        requestId: attempt.current.id,
+      },
+      "POST",
+      true,
+    );
   }
   function act(
     action: "answers" | "back" | "complete",
@@ -102,6 +128,7 @@ export default function Home() {
       `/api/intake/${intake.id}`,
       { action, version: intake.version, ...(answers ? { answers } : {}) },
       "PATCH",
+      action === "answers",
     );
   }
   if (intake)
@@ -149,6 +176,16 @@ export default function Home() {
               onClick={() => {
                 setIntake(resumable);
                 setError(undefined);
+                if (resumable.ready) {
+                  void send(
+                    `/api/intake/${resumable.id}`,
+                    {
+                      action: "complete",
+                      version: resumable.version,
+                    },
+                    "PATCH",
+                  );
+                }
               }}
             >
               Continue your saved move setup

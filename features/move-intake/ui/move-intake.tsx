@@ -124,20 +124,26 @@ export function MoveIntake({
             <Badge variant="secondary">Move setup</Badge>
             <span className="text-xs text-muted-foreground" role="status">
               {intake.ready
-                ? "Ready to build your plan"
+                ? pending
+                  ? "Building your plan"
+                  : "Ready to retry"
                 : `${unanswered.length} answer${unanswered.length === 1 ? "" : "s"} left`}
             </span>
           </div>
           <CardTitle>
             <h1 ref={heading} tabIndex={-1} className="outline-none">
               {intake.ready
-                ? "Here’s the move we’ll plan"
+                ? pending
+                  ? "Building your moving plan"
+                  : "Your move setup is ready"
                 : "Tell us about your move"}
             </h1>
           </CardTitle>
           <CardDescription>
             {intake.ready
-              ? "Review your requirements. We’ll use them to build your route, housing options, moving services, budget, and timeline."
+              ? pending
+                ? "We’re preparing your route, housing options, moving services, budget, and timeline."
+                : "Your answers are saved. You can retry building your plan or edit your setup."
               : "Answer the questions below. We’ll save your completed answers together when you continue."}
           </CardDescription>
         </CardHeader>
@@ -347,7 +353,7 @@ export function MoveIntake({
                   ) : null}
                   {pending
                     ? "Building your dashboard…"
-                    : "Build my moving plan"}
+                    : "Retry building my plan"}
                   <ArrowRight data-icon="inline-end" />
                 </Button>
               </div>

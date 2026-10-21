@@ -19,6 +19,7 @@ import {
 import { searchHousing } from "@/lib/providers/rentcast";
 import { extractRelocationDetails } from "@/lib/plans/prompt";
 import type { IntakeFields } from "@/lib/intake/schema";
+import { testExpenseEstimates } from "./fixtures/estimates";
 const now = new Date("2026-10-18T12:00:00Z");
 const full = { ...demoFamily, otherNeeds: "No additional requirements" };
 function without(...keys: (keyof IntakeFields)[]) {
@@ -51,7 +52,10 @@ describe("shared UI and MCP move intake", () => {
       transport: "compare",
     });
     expect(input.planningContext?.assumptions.join(" ")).toContain("No pets");
-    const modes = recommendations(input)
+    const modes = recommendations({
+      ...input,
+      expenseEstimates: testExpenseEstimates,
+    })
       .map((option) => option.transport)
       .join(" ");
     expect(modes).toContain("Drive");
@@ -185,7 +189,7 @@ describe("shared UI and MCP move intake", () => {
         { questionId: "movingDate", choice: "30" },
         { questionId: "housing", choice: "no" },
         { questionId: "belongings", choice: "luggage" },
-        { questionId: "budget", choice: "estimate" },
+        { questionId: "budget", text: "4000" },
       ],
     );
     expect(view.ready).toBe(true);

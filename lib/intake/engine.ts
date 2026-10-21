@@ -1,9 +1,5 @@
 import { groupCitiesByState } from "@mardillu/us-cities-utils";
-import {
-  calculateBudget,
-  relocationInputSchema,
-  type RelocationInput,
-} from "@/lib/relocation";
+import { relocationInputSchema, type RelocationInput } from "@/lib/relocation";
 import { isUsLocation, US_ONLY_ERROR } from "@/lib/us-location";
 import { PlanError } from "@/lib/plans/errors";
 import {
@@ -243,44 +239,17 @@ export function pendingQuestions(state: IntakeState): IntakeQuestion[] {
     });
   }
   if (f.budget === undefined) {
-    const base = estimateMovingBudget(f);
     questions.push({
       id: "budget",
       title: "What is your total moving budget?",
-      description: `Separate from monthly rent. A planning estimate of ${money(base)} covers travel, moving, packing${f.needsHousing !== false ? ", first rent and deposit" : ""}. These are estimates, not mover quotes.`,
+      description:
+        "Enter the total amount you have available for the move, separate from your monthly rent limit.",
       placeholder: "Total move budget in USD",
       inputType: "number",
-      options: [
-        {
-          id: "estimate",
-          label: `${money(base)} · use estimate`,
-          values: { budget: base },
-        },
-        {
-          id: "buffer",
-          label: `${money(Math.ceil((base * 1.2) / 100) * 100)} · with buffer`,
-          values: { budget: Math.ceil((base * 1.2) / 100) * 100 },
-        },
-      ],
+      options: [],
     });
   }
   return questions;
-}
-
-function estimateMovingBudget(f: IntakeFields) {
-  return (
-    Math.ceil(
-      calculateBudget({
-        ...f,
-        adults: f.adults ?? 1,
-        children: f.children ?? 0,
-        pets: f.pets ?? 0,
-        scenario: (f.adults ?? 1) + (f.children ?? 0) > 1 ? "family" : "alone",
-        needsHousing: f.needsHousing ?? true,
-        maxRent: f.maxRent ?? 0,
-      } as RelocationInput).recommended / 100,
-    ) * 100
-  );
 }
 
 export function intakeView(raw: IntakeState): IntakeView {
