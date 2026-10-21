@@ -135,7 +135,7 @@ export async function searchHousing(
           Accept: "application/json",
           "X-Api-Key": token,
         },
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(5_000),
         cache: "no-store",
       },
     );

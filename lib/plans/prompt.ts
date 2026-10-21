@@ -45,7 +45,7 @@ export async function extractRelocationDetails(
     const response = await new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       maxRetries: 0,
-      timeout: 60_000,
+      timeout: 10_000,
     }).responses.parse(
       {
         model: process.env.OPENAI_MODEL || "gpt-5-mini",
@@ -65,7 +65,7 @@ Return only the structured result.`,
           format: zodTextFormat(extractedMoveSchema, "relocation_request"),
         },
       },
-      { signal: AbortSignal.timeout(65_000) },
+      { signal: AbortSignal.timeout(10_000) },
     );
 
     if (!response.output_parsed)

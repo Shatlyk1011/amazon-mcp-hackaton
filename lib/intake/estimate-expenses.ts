@@ -16,7 +16,7 @@ export async function estimateMovingExpenses(input: RelocationInput) {
     const response = await new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       maxRetries: 0,
-      timeout: 20_000,
+      timeout: 15_000,
     }).responses.parse({
       model: process.env.OPENAI_MODEL || "gpt-5-mini",
       store: false,

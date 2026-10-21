@@ -89,7 +89,7 @@ export async function buildPlanMap(result: PlanResult) {
     const overlay = encodeURIComponent(JSON.stringify(feature));
     const response = await fetch(
       `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/geojson(${overlay})/auto/900x400?padding=45&access_token=${encodeURIComponent(token)}`,
-      { cache: "no-store", signal: AbortSignal.timeout(8_000) },
+      { cache: "no-store", signal: AbortSignal.timeout(4_000) },
     );
     if (
       !response.ok ||
@@ -133,7 +133,7 @@ export async function buildHousingMap(result: PlanResult) {
   try {
     const response = await fetch(
       `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${pins.join(",")}/auto/900x400?padding=70&access_token=${encodeURIComponent(token)}`,
-      { cache: "no-store", signal: AbortSignal.timeout(8_000) },
+      { cache: "no-store", signal: AbortSignal.timeout(4_000) },
     );
     if (
       !response.ok ||

@@ -1,6 +1,7 @@
 import type { AuthInfo } from "@modelcontextprotocol/server";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
+
 import { usCitySchema } from "@/lib/us-location";
 import { registerIntakeTools } from "@/lib/intake/mcp";
 import { withMovingEstimates } from "@/lib/intake/estimate-expenses";
@@ -24,6 +25,8 @@ import {
   searchDestinationEssentials,
   searchMovingServices,
 } from "@/lib/providers/tomtom-search";
+
+export const maxDuration = 60;
 
 const readOnlyAnnotations = {
   readOnlyHint: true,

@@ -51,7 +51,7 @@ function fallbackRoute(
 async function geocode(query: string, token: string) {
   const response = await fetch(
     `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${encodeURIComponent(token)}&limit=1&types=place,locality,region`,
-    { signal: AbortSignal.timeout(15_000), cache: "no-store" },
+    { signal: AbortSignal.timeout(5_000), cache: "no-store" },
   );
   if (!response.ok)
     throw new Error(`Mapbox geocoding failed with ${response.status}`);
@@ -94,7 +94,7 @@ export async function calculateMapboxRoute(
     ]);
     const response = await fetch(
       `https://api.mapbox.com/directions/v5/mapbox/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}?alternatives=false&geometries=geojson&overview=full&steps=false&access_token=${encodeURIComponent(token)}`,
-      { signal: AbortSignal.timeout(15_000), cache: "no-store" },
+      { signal: AbortSignal.timeout(5_000), cache: "no-store" },
     );
     if (!response.ok)
       throw new Error(`Mapbox directions failed with ${response.status}`);

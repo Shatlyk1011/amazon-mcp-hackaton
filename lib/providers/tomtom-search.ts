@@ -119,7 +119,7 @@ export async function searchMovingServices(
   try {
     const response = await fetch(
       `https://api.tomtom.com/search/2/search/${encodeURIComponent(query)}.json?${params.toString()}`,
-      { signal: AbortSignal.timeout(15_000), cache: "no-store" },
+      { signal: AbortSignal.timeout(5_000), cache: "no-store" },
     );
     if (!response.ok)
       throw new Error(`TomTom Search request failed with ${response.status}`);
