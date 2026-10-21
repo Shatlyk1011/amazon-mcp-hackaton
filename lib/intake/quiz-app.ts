@@ -1,4 +1,7 @@
-export const quizResourceUri = "ui://moveflow/quiz.html";
+import { resultRenderer, resultStyles } from "./result-app";
+
+export const quizResourceUri = "ui://moveflow/quiz-v2.html";
+export const resultResourceUri = "ui://moveflow/plan-v1.html";
 
 // A self-contained resource lets MCP Apps hosts render it without fetching assets.
 export const quizHtml = String.raw`<!doctype html>
@@ -6,7 +9,8 @@ export const quizHtml = String.raw`<!doctype html>
 <style>
 :root{color-scheme:light dark;font-family:system-ui,sans-serif;color:var(--color-text-primary,CanvasText);background:var(--color-background-primary,Canvas)}
 *{box-sizing:border-box}body{margin:0;padding:16px}main{max-width:540px;margin:auto}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.65}h1{font-size:22px;line-height:1.25;margin:10px 0}p{line-height:1.45;opacity:.78;margin:0 0 16px}fieldset{border:0;padding:0;margin:0;display:grid;gap:8px}legend{font-weight:600;margin-bottom:10px}.option{display:flex;align-items:center;gap:12px;border:1px solid color-mix(in srgb,CanvasText 22%,transparent);border-radius:12px;padding:12px;cursor:pointer}.option:has(input:checked){border-color:#3275b8;background:color-mix(in srgb,#3275b8 12%,Canvas)}input[type=radio]{accent-color:#3275b8;width:18px;height:18px;margin:0;flex:none}label.text-label{display:block;font-weight:600;font-size:14px;margin:16px 0 8px}textarea,input.entry{font:inherit;color:inherit;background:transparent;border:1px solid color-mix(in srgb,CanvasText 30%,transparent);border-radius:10px;padding:10px;width:100%}textarea{resize:vertical;min-height:72px}button{font:inherit;font-weight:650;border:0;border-radius:10px;background:#286aa8;color:white;padding:11px 18px;margin-top:16px;cursor:pointer}button:disabled{opacity:.5;cursor:wait}:focus-visible{outline:3px solid #6ba6e0;outline-offset:2px}.error{color:#c63636;opacity:1;margin-top:12px}.summary{white-space:pre-wrap}
-</style></head><body><main><div class="eyebrow">MoveFlow · move setup</div><div id="app" role="region" aria-live="polite"><h1>Preparing your questions…</h1></div></main>
+${resultStyles}
+</style></head><body><main><div class="eyebrow">MoveFlow</div><div id="app" role="region" aria-live="polite"><h1>Preparing your move…</h1></div></main>
 <script>
 (() => {
   const root = document.getElementById('app');
@@ -14,28 +18,37 @@ export const quizHtml = String.raw`<!doctype html>
   const pending = new Map();
   const notify = (method, params) => parent.postMessage({jsonrpc:'2.0',method,params}, '*');
   const request = (method, params) => new Promise((resolve,reject) => {
-    const id = ++nextId; pending.set(id,{resolve,reject});
+    const id = ++nextId;
+    const timer=setTimeout(()=>{pending.delete(id);reject(new Error('The request timed out. Try again.'));},method==='tools/call'?120000:15000);
+    pending.set(id,{resolve,reject,timer});
     parent.postMessage({jsonrpc:'2.0',id,method,params}, '*');
   });
   function element(tag, text, className) { const el=document.createElement(tag); if(text) el.textContent=text; if(className) el.className=className; return el; }
-  function resize() { notify('ui/notifications/size-changed',{height:document.documentElement.scrollHeight}); }
+  let lastHeight=0;
+  function resize() {
+    const height=Math.ceil(document.body.getBoundingClientRect().height);
+    if(height>0&&height!==lastHeight){lastHeight=height;notify('ui/notifications/size-changed',{height});}
+  }
+  if(typeof ResizeObserver!=='undefined')new ResizeObserver(resize).observe(document.body);
+  window.addEventListener('resize',resize);
+  root.addEventListener('toggle',resize,true);
   function showError(message) { let el=root.querySelector('.error'); if(!el){el=element('p','','error');el.setAttribute('role','alert');root.append(el)} el.textContent=message; resize(); }
+${resultRenderer}
   function update(result) {
     if(result && result.isError) throw new Error(result.content?.[0]?.text || 'Could not save your answer.');
+    if(result?.structuredContent?.status==='ready'){renderPlan(result.structuredContent,result._meta?.moveflow);return;}
     if(!result?.structuredContent?.state) throw new Error('The quiz response was incomplete.');
     view=result.structuredContent; render();
   }
   function render() {
     root.replaceChildren();
     if(view.ready){
-      root.append(element('h1','Your move setup is ready'),element('p','Your answers are ready. Continue in the conversation to build your moving plan.'));
+      root.append(element('h1','Your move setup is ready'),element('p','Build your moving plan to compare homes, review the budget, and follow your timeline here.'));
       const list=element('p',view.summary.map(f => f.field + ': ' + f.value).join('\n'),'summary'); root.append(list);
-      const button=element('button','Continue in chat'); root.append(button);
-      button.onclick=async()=>{button.disabled=true;try{
-        await request('ui/update-model-context',{content:[{type:'text',text:'The user completed the move setup. Use this latest intake state with generate_move_plan: '+JSON.stringify(view.state)}]});
-        await request('ui/message',{role:'user',content:[{type:'text',text:'My move setup is complete. Please build my moving plan.'}]});
-        button.textContent='Sent to chat';
-      }catch(e){button.disabled=false;showError('Could not send to chat. Tell the assistant you finished the quiz.');}};
+      const button=element('button','Build my moving plan'); root.append(button);
+      button.onclick=async()=>{if(busy)return;busy=true;button.disabled=true;button.textContent='Building your plan…';root.querySelector('.error')?.remove();try{
+        update(await request('tools/call',{name:'generate_move_plan',arguments:{state:view.state}}));
+      }catch(e){button.disabled=false;button.textContent='Retry building my plan';showError(e?.message||'The plan could not be built. Retry using your saved answers.');}finally{busy=false;}};
       resize(); return;
     }
     const q=view.nextQuestion; if(!q){showError('No question is available. Continue in the conversation.');return;}
@@ -58,9 +71,9 @@ export const quizHtml = String.raw`<!doctype html>
     resize();
   }
   window.addEventListener('message',event=>{if(event.source!==parent)return;const m=event.data;if(!m||m.jsonrpc!=='2.0')return;
-    if(typeof m.id==='number'&&pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);m.error?p.reject(m.error):p.resolve(m.result);return;}
+    if(typeof m.id==='number'&&pending.has(m.id)){const p=pending.get(m.id);clearTimeout(p.timer);pending.delete(m.id);m.error?p.reject(m.error):p.resolve(m.result);return;}
     if(m.method==='ui/notifications/tool-result'){try{update(m.params)}catch(e){showError(e.message)}}
   });
-  request('ui/initialize',{appInfo:{name:'MoveFlow quiz',version:'1.0.0'},appCapabilities:{},protocolVersion:'2026-01-26'}).then(()=>notify('ui/notifications/initialized',{})).catch(()=>showError('The quiz could not connect. Continue in the conversation.'));
+  request('ui/initialize',{appInfo:{name:'MoveFlow',version:'2.0.0'},appCapabilities:{},protocolVersion:'2026-01-26'}).then(()=>notify('ui/notifications/initialized',{})).catch(()=>showError('The quiz could not connect. Continue in the conversation.'));
 })();
 </script></body></html>`;

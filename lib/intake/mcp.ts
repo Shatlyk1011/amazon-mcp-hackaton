@@ -4,10 +4,11 @@ import { usCitySchema, US_ONLY_ERROR } from "@/lib/us-location";
 import { PlanError } from "@/lib/plans/errors";
 import { generatePlan } from "@/lib/plans/generate";
 import {
-  assessMoveReadiness,
-  buildMoveTimeline,
-  createMoveBriefing,
-} from "@/lib/relocation-insights";
+  buildHousingMap,
+  buildPlanMap,
+  buildPlanPresentation,
+  movePlanText,
+} from "./plan-result";
 import { completeIntake, intakeView } from "./engine";
 import {
   intakeAnswerSchema,
@@ -15,7 +16,7 @@ import {
   intakeStateSchema,
 } from "./schema";
 import { continueIntake, getRentGuidance, prepareIntake } from "./service";
-import { quizHtml, quizResourceUri } from "./quiz-app";
+import { quizHtml, quizResourceUri, resultResourceUri } from "./quiz-app";
 
 const annotations = {
   readOnlyHint: true,
@@ -52,23 +53,33 @@ async function output(work: () => Promise<unknown>) {
 // Public tools are stateless: the caller owns the explicit state snapshot.
 // Browser sessions persist this same snapshot in the owner-scoped intake table.
 export function registerIntakeTools(server: McpServer) {
-  server.registerResource(
-    "move-quiz",
-    quizResourceUri,
-    {
-      title: "Move setup quiz",
-      mimeType: "text/html;profile=mcp-app",
-    },
-    async (uri) => ({
-      contents: [
-        {
-          uri: uri.href,
-          mimeType: "text/html;profile=mcp-app",
-          text: quizHtml,
-        },
-      ],
-    }),
-  );
+  for (const resourceUri of [quizResourceUri, resultResourceUri]) {
+    server.registerResource(
+      resourceUri === quizResourceUri ? "move-quiz" : "move-plan",
+      resourceUri,
+      {
+        title:
+          resourceUri === quizResourceUri
+            ? "Move setup quiz"
+            : "Your moving plan",
+        mimeType: "text/html;profile=mcp-app",
+      },
+      async (uri) => ({
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "text/html;profile=mcp-app",
+            text: quizHtml,
+            _meta: {
+              "openai/widgetDescription":
+                "MoveFlow renders the complete provider-backed moving plan: route map, housing comparison, budget, timeline, and sources. Avoid repeating the full plan outside the app.",
+              ui: { csp: { connectDomains: [], resourceDomains: [] } },
+            },
+          },
+        ],
+      }),
+    );
+  }
   server.registerTool(
     "prepare_move_intake",
     {
@@ -127,41 +138,41 @@ export function registerIntakeTools(server: McpServer) {
     "generate_move_plan",
     {
       description:
-        "Generate the complete relocation dashboard data from an explicit intake state: route/map coordinates, housing listings, moving services, budget, strategies, timeline, readiness and briefing. If essential context is missing, returns needs_input plus the exact next question instead of guessing. Standalone: no browser, database, prior tool call or plan ID required when a complete state is supplied. Results are non-persistent and provider limitations are included.",
+        "Generate and display the final MoveFlow moving plan from explicit intake state. The MCP App renders the server-authored map, housing comparison, budget, timeline, moving services, and provider limitations; text content is a ready-to-use fallback. Use this as the primary result, without an extra LLM call or web research to reconstruct the plan. Additional research is optional if the user requests it. If essential context is missing, returns needs_input and the exact next question instead of guessing. Standalone and non-persistent; no browser, database, or plan ID required.",
+      _meta: {
+        ui: { resourceUri: resultResourceUri, visibility: ["model", "app"] },
+      },
       inputSchema: z.object({ state: intakeStateSchema }),
       annotations,
     },
-    ({ state }) =>
-      output(async () => {
+    async ({ state }) => {
+      try {
         const view = intakeView(state);
-        if (!view.ready) return { status: "needs_input", ...view };
+        if (!view.ready)
+          return output(async () => ({ status: "needs_input", ...view }));
         const input = completeIntake(state);
         const result = await generatePlan(input);
-        const snapshot = {
-          input,
-          routeAvailable: Boolean(
-            (result.route?.originCoordinates &&
-              result.route?.destinationCoordinates) ||
-            (result.flightSchedules?.status === "live" &&
-              result.flightSchedules.connections.length),
-          ),
-          housingOptionsAvailable: result.housing.some(
-            (item) => !item.isDemoData,
-          ),
-          movingServicesAvailable: result.movers.some(
-            (item) => !item.isDemoData,
-          ),
-          selectedHousingId: null,
-          selectedMoverId: null,
-        };
+        const plan = buildPlanPresentation(result, state);
+        const [map, housingMap] = await Promise.all([
+          buildPlanMap(result),
+          buildHousingMap(result),
+        ]);
         return {
-          status: "ready",
-          persisted: false,
-          result,
-          timeline: buildMoveTimeline(input),
-          readiness: assessMoveReadiness(snapshot),
-          briefing: createMoveBriefing(snapshot),
+          content: [{ type: "text" as const, text: movePlanText(plan) }],
+          structuredContent: plan,
+          _meta: { moveflow: { map, housingMap } },
         };
-      }),
+      } catch {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text" as const,
+              text: "The moving plan could not be generated. Your answers are still available; retry building the plan.",
+            },
+          ],
+        };
+      }
+    },
   );
 }

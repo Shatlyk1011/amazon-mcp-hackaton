@@ -217,10 +217,10 @@ describe("public MCP standalone contracts", () => {
         (tool) => tool.name === "prepare_move_intake",
       );
       expect(prepare?._meta?.ui).toEqual({
-        resourceUri: "ui://moveflow/quiz.html",
+        resourceUri: "ui://moveflow/quiz-v2.html",
       });
       const resource = await client.readResource({
-        uri: "ui://moveflow/quiz.html",
+        uri: "ui://moveflow/quiz-v2.html",
       });
       expect(resource.contents[0]).toMatchObject({
         mimeType: "text/html;profile=mcp-app",
