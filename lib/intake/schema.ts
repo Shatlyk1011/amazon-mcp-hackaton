@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { usIntakeLocationSchema } from "@/lib/us-location";
 import { relocationInputSchema } from "@/lib/relocation";
+import { movingEstimatesSchema } from "@/lib/moving-estimates";
 
 // No defaults: an absent fact must remain absent until the user supplies it.
 export const intakeFieldsSchema = relocationInputSchema
-  .omit({ planningContext: true })
+  .omit({ planningContext: true, expenseEstimates: true })
   .partial()
   .extend({
     origin: usIntakeLocationSchema.optional(),
@@ -48,6 +49,7 @@ export const intakeStateSchema = z
     sources: z.record(z.string(), factSourceSchema),
     contextIncluded: z.boolean(),
     rentGuidance: rentGuidanceSchema.optional(),
+    expenseEstimates: movingEstimatesSchema.optional(),
   })
   .strict();
 export const intakeAnswerSchema = z

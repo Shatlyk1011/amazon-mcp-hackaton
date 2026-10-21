@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { movingEstimatesSchema } from "@/lib/moving-estimates";
 import { usCitySchema } from "@/lib/us-location";
 import { calculateMapboxRoute, type RouteResult } from "@/lib/providers/mapbox";
 
@@ -21,6 +22,7 @@ export const relocationInputSchema = z.object({
   minBedrooms: z.number().int().nonnegative(),
   petFriendly: z.boolean(),
   neighborhood: z.string().max(300).optional(),
+  expenseEstimates: movingEstimatesSchema.optional(),
   planningContext: z
     .object({
       includedSavedContext: z.boolean(),
@@ -172,11 +174,14 @@ export function calculateBudget(
   input: RelocationInput,
   selectedHousing?: Pick<Housing, "monthlyRent">,
 ) {
-  const housingUpfront = selectedHousing
-    ? selectedHousing.monthlyRent * 2 + 250
-    : input.needsHousing
-      ? input.maxRent * 2 + 250
-      : 0;
+  const estimates = input.expenseEstimates;
+  const monthlyRent = input.needsHousing
+    ? (selectedHousing?.monthlyRent ?? estimates?.monthlyRent ?? input.maxRent)
+    : 0;
+  const includeSecurityDeposit = estimates?.includeSecurityDeposit ?? true;
+  const housingFees = input.needsHousing ? (estimates?.housingFees ?? 250) : 0;
+  const securityDeposit = includeSecurityDeposit ? monthlyRent : 0;
+  const housingUpfront = monthlyRent + securityDeposit + housingFees;
   const travel =
     input.transport === "fly"
       ? (input.adults + input.children) * 280 + input.pets * 180
@@ -194,18 +199,32 @@ export function calculateBudget(
       : 180
     : 40;
   const pet = input.pets * 180;
-  const base = Math.round(housingUpfront + travel + moving + supplies + pet);
+  const transportation = estimates?.transportation ?? travel;
+  const movingAllowance = input.furniture ? (estimates?.moving ?? moving) : 0;
+  const additional = estimates?.additional ?? supplies + pet;
+  const temporaryAccommodation = estimates?.temporaryAccommodation ?? 0;
+  const base = Math.round(
+    housingUpfront +
+      transportation +
+      movingAllowance +
+      additional +
+      temporaryAccommodation,
+  );
   return {
     budget: input.budget,
     minimal: Math.round(base * 0.78),
     recommended: base,
     fullService: Math.round(base * 1.35),
     housingUpfront,
-    monthlyRent:
-      selectedHousing?.monthlyRent ?? (input.needsHousing ? input.maxRent : 0),
-    transportation: travel,
-    moving,
-    additional: supplies + pet,
+    monthlyRent,
+    securityDeposit,
+    includeSecurityDeposit,
+    housingFees,
+    temporaryAccommodation,
+    estimateSource: estimates?.source ?? ("planning_rules" as const),
+    transportation,
+    moving: movingAllowance,
+    additional,
     remaining: input.budget - base,
   };
 }

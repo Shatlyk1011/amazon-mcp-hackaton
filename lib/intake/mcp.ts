@@ -4,19 +4,25 @@ import { usCitySchema, US_ONLY_ERROR } from "@/lib/us-location";
 import { PlanError } from "@/lib/plans/errors";
 import { generatePlan } from "@/lib/plans/generate";
 import {
+  movingEstimatesSchema,
+  type MovingEstimates,
+} from "@/lib/moving-estimates";
+import {
   buildHousingMap,
   buildPlanMap,
   buildPlanPresentation,
   movePlanText,
 } from "./plan-result";
-import { completeIntake, intakeView } from "./engine";
+import { applyIntakeFields, completeIntake, intakeView } from "./engine";
 import {
   intakeAnswerSchema,
   intakeFieldsSchema,
   intakeStateSchema,
+  type IntakeState,
 } from "./schema";
 import { continueIntake, getRentGuidance, prepareIntake } from "./service";
 import { quizHtml, quizResourceUri, resultResourceUri } from "./quiz-app";
+import { estimateMovingExpenses } from "./estimate-expenses";
 
 const annotations = {
   readOnlyHint: true,
@@ -24,6 +30,66 @@ const annotations = {
   idempotentHint: true,
   openWorldHint: true,
 };
+
+const planChangesSchema = intakeFieldsSchema.pick({
+  movingDate: true,
+  adults: true,
+  children: true,
+  pets: true,
+  furniture: true,
+  suitcases: true,
+  transport: true,
+  needsHousing: true,
+  maxRent: true,
+  minBedrooms: true,
+  bedrooms: true,
+  budget: true,
+  otherNeeds: true,
+});
+
+async function generateMoveResult(
+  state: IntakeState,
+  estimates?: MovingEstimates,
+) {
+  try {
+    const latest = intakeStateSchema.parse({
+      ...state,
+      // Model suggestions must never silently replace the user's applied costs.
+      expenseEstimates:
+        state.expenseEstimates?.source === "user"
+          ? state.expenseEstimates
+          : (estimates ?? state.expenseEstimates),
+    });
+    const view = intakeView(latest);
+    if (!view.ready)
+      return output(async () => ({ status: "needs_input", ...view }));
+    if (!latest.expenseEstimates)
+      latest.expenseEstimates = await estimateMovingExpenses(
+        completeIntake(latest),
+      );
+    const result = await generatePlan(completeIntake(latest));
+    const plan = buildPlanPresentation(result, latest);
+    const [map, housingMap] = await Promise.all([
+      buildPlanMap(result),
+      buildHousingMap(result),
+    ]);
+    return {
+      content: [{ type: "text" as const, text: movePlanText(plan) }],
+      structuredContent: plan,
+      _meta: { moveflow: { map, housingMap } },
+    };
+  } catch {
+    return {
+      isError: true,
+      content: [
+        {
+          type: "text" as const,
+          text: "The moving plan could not be generated. Your answers are still available; retry building the plan.",
+        },
+      ],
+    };
+  }
+}
 async function output(work: () => Promise<unknown>) {
   try {
     const result = await work();
@@ -72,7 +138,7 @@ export function registerIntakeTools(server: McpServer) {
             text: quizHtml,
             _meta: {
               "openai/widgetDescription":
-                "MoveFlow renders the complete provider-backed moving plan: route map, housing comparison, budget, timeline, and sources. Avoid repeating the full plan outside the app.",
+                "MoveFlow renders an editable moving plan: maps, housing, estimated expenses, preferences, timeline, and sources. The Update my relocation plan button refreshes the plan and requests a concise updated chat response.",
               ui: { csp: { connectDomains: [], resourceDomains: [] } },
             },
           },
@@ -84,11 +150,22 @@ export function registerIntakeTools(server: McpServer) {
     "prepare_move_intake",
     {
       description:
-        "Start an adaptive relocation interview from the user’s actual words and/or details the user explicitly provided. Leave unknown fields out of known; never invent or assume an origin, destination, or other answers. Do not answer questions or select options on the user’s behalf. Let the user complete the interactive quiz or ask them each returned question and wait for their answer before calling answer_move_intake. Returns ready, nextQuestion, summary and caller-owned state. Optional supplied savedContext is used only when includeContext is true. Does not read browser sessions or save data.",
+        "Use this when someone wants help planning a move or relocation between US cities, such as “I’m moving from Boston to Austin” or “help me relocate to Denver.” Start an interactive moving-plan intake even if they do not mention MoveFlow. Use their actual words and explicitly provided details. Do not use for a simple trip or flight search without a relocation request. Leave unknown fields out of known; never invent or assume an origin, destination, or other answers. Do not answer questions or select options on the user’s behalf. Let the user complete the interactive quiz or ask them each returned question and wait for their answer before calling answer_move_intake. Returns ready, nextQuestion, summary and caller-owned state. Optional supplied savedContext is used only when includeContext is true. Does not read browser sessions or save data.",
       _meta: { ui: { resourceUri: quizResourceUri } },
       inputSchema: z.object({
-        prompt: z.string().trim().max(4000).default(""),
-        known: intakeFieldsSchema.default({}),
+        prompt: z
+          .string()
+          .trim()
+          .max(4000)
+          .default("")
+          .describe(
+            "The user’s relocation request in their own words, including any stated cities and preferences.",
+          ),
+        known: intakeFieldsSchema
+          .default({})
+          .describe(
+            "Relocation details explicitly supplied by the user; omit unknown fields.",
+          ),
         savedContext: intakeFieldsSchema.default({}),
         includeContext: z.boolean().default(false),
       }),
@@ -138,41 +215,46 @@ export function registerIntakeTools(server: McpServer) {
     "generate_move_plan",
     {
       description:
-        "Generate and display the final MoveFlow moving plan from explicit intake state. The MCP App renders the server-authored map, housing comparison, budget, timeline, moving services, and provider limitations; text content is a ready-to-use fallback. Use this as the primary result, without an extra LLM call or web research to reconstruct the plan. Additional research is optional if the user requests it. If essential context is missing, returns needs_input and the exact next question instead of guessing. Standalone and non-persistent; no browser, database, or plan ID required.",
+        "Generate and display the editable MoveFlow moving plan from explicit intake state. Supply estimates with source=model for initial relocation cost assumptions based on the route, household and typical relocation prices. These are labeled GPT planning estimates, never live quotes or verified market averages. Keep estimated monthlyRent separate from the user's maxRent ceiling. Omitted amounts use MoveFlow planning rules. Never invent user facts or overwrite applied user costs. The app lets the user edit expenses and preferences, then call update_move_plan. Returns maps, housing, budget, timeline, services and provider limitations with a text fallback. If essential context is missing, returns needs_input and the next question. Stateless; no database or plan ID required.",
       _meta: {
         ui: { resourceUri: resultResourceUri, visibility: ["model", "app"] },
       },
-      inputSchema: z.object({ state: intakeStateSchema }),
+      inputSchema: z.object({
+        state: intakeStateSchema,
+        estimates: movingEstimatesSchema.optional(),
+      }),
       annotations,
     },
-    async ({ state }) => {
-      try {
-        const view = intakeView(state);
-        if (!view.ready)
-          return output(async () => ({ status: "needs_input", ...view }));
-        const input = completeIntake(state);
-        const result = await generatePlan(input);
-        const plan = buildPlanPresentation(result, state);
-        const [map, housingMap] = await Promise.all([
-          buildPlanMap(result),
-          buildHousingMap(result),
-        ]);
-        return {
-          content: [{ type: "text" as const, text: movePlanText(plan) }],
-          structuredContent: plan,
-          _meta: { moveflow: { map, housingMap } },
+    ({ state, estimates }) => generateMoveResult(state, estimates),
+  );
+  server.registerTool(
+    "update_move_plan",
+    {
+      description:
+        "Apply the user's explicit expense or preference edits to the latest caller-owned state and regenerate the relocation plan, including housing searches, budget, readiness and timeline. Pass only changed preferences in changes. Estimates are editable planning allowances, not quotes. User edits take precedence over GPT defaults. Returns the latest state in structuredContent.state for subsequent updates. Does not persist or book anything.",
+      _meta: { ui: { visibility: ["model", "app"] } },
+      inputSchema: z.object({
+        state: intakeStateSchema,
+        changes: planChangesSchema.default({}),
+        estimates: movingEstimatesSchema.optional(),
+      }),
+      annotations,
+    },
+    ({ state, changes, estimates }) => {
+      const latest = applyIntakeFields(state, {
+        ...changes,
+        ...(changes.pets !== undefined
+          ? { petFriendly: changes.pets > 0 }
+          : {}),
+      });
+      if (changes.pets === 0) delete latest.fields.petInfo;
+      if (estimates)
+        latest.expenseEstimates = {
+          ...state.expenseEstimates,
+          ...estimates,
+          source: "user",
         };
-      } catch {
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text" as const,
-              text: "The moving plan could not be generated. Your answers are still available; retry building the plan.",
-            },
-          ],
-        };
-      }
+      return generateMoveResult(latest);
     },
   );
 }
