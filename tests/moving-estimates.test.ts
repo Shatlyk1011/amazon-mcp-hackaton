@@ -3,6 +3,7 @@ vi.mock("server-only", () => ({}));
 const parse = vi.hoisted(() => vi.fn());
 vi.mock("openai", () => ({
   default: class {
+    static APIError = class extends Error {};
     responses = { parse };
   },
 }));
@@ -93,7 +94,7 @@ describe("initial GPT expense estimates", () => {
   it("reports unavailable estimates instead of inventing a fixed fallback", async () => {
     vi.stubEnv("OPENAI_API_KEY", "");
     await expect(withMovingEstimates(demoFamily)).rejects.toThrow(
-      "Moving estimates are unavailable",
+      "Moving cost estimates are temporarily unavailable",
     );
   });
   it("falls back without a key, on errors, refusals, or invalid amounts", async () => {

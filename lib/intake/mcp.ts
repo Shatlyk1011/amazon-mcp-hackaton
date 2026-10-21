@@ -75,13 +75,16 @@ async function generateMoveResult(
       structuredContent: plan,
       _meta: { moveflow: { map, housingMap } },
     };
-  } catch {
+  } catch (error) {
     return {
       isError: true,
       content: [
         {
           type: "text" as const,
-          text: "The moving plan could not be generated. Your answers are still available; retry building the plan.",
+          text:
+            error instanceof PlanError
+              ? error.message
+              : "The moving plan could not be generated. Your answers are still available; retry building the plan.",
         },
       ],
     };

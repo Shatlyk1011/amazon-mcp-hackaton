@@ -3,20 +3,25 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { movingEstimatesSchema } from "@/lib/moving-estimates";
 import type { RelocationInput } from "@/lib/relocation";
+import { PlanError } from "@/lib/plans/errors";
 
 const generatedExpensesSchema = movingEstimatesSchema
   .omit({ source: true })
   .required();
 
-// Called only for a complete plan with no caller-supplied estimates. Failures
-// leave the existing planning-rule fallback available and truthfully labeled.
+// Called only for a complete plan with no caller-supplied estimates.
 export async function estimateMovingExpenses(input: RelocationInput) {
-  if (!process.env.OPENAI_API_KEY) return undefined;
+  if (!process.env.OPENAI_API_KEY) {
+    console.error(
+      "Moving expense estimation unavailable: API key is not configured",
+    );
+    return undefined;
+  }
   try {
     const response = await new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       maxRetries: 0,
-      timeout: 15_000,
+      timeout: 45_000,
     }).responses.parse({
       model: process.env.OPENAI_MODEL || "gpt-5-mini",
       store: false,
@@ -45,7 +50,10 @@ Do not change the user's facts, spend their entire available budget automaticall
         format: zodTextFormat(generatedExpensesSchema, "moving_expenses"),
       },
     });
-    if (!response.output_parsed) return undefined;
+    if (!response.output_parsed) {
+      console.error("Moving expense estimation returned no structured output");
+      return undefined;
+    }
     const parsed = movingEstimatesSchema.parse({
       ...generatedExpensesSchema.parse(response.output_parsed),
       source: "model",
@@ -60,7 +68,12 @@ Do not change the user's facts, spend their entire available budget automaticall
         input.needsHousing && parsed.includeSecurityDeposit,
       moving: input.furniture ? parsed.moving : 0,
     };
-  } catch {
+  } catch (error) {
+    // Do not log the request, provider response, or credentials.
+    console.error("Moving expense estimation failed", {
+      name: error instanceof Error ? error.name : "unknown",
+      status: error instanceof OpenAI.APIError ? error.status : undefined,
+    });
     return undefined;
   }
 }
@@ -85,8 +98,9 @@ export async function withMovingEstimates(input: RelocationInput) {
     return input;
   const generated = await estimateMovingExpenses(input);
   if (!generated)
-    throw new Error(
-      "Moving estimates are unavailable. Check OpenAI configuration and retry.",
+    throw new PlanError(
+      "Moving cost estimates are temporarily unavailable. Your answers are still here. Please try again later.",
+      503,
     );
   return {
     ...input,

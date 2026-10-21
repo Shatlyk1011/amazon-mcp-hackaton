@@ -729,7 +729,7 @@ describe("shipped app bridge", () => {
     await building;
     expect(button.disabled).toBe(false);
     expect(button.textContent).toContain("Retry");
-    expect(app.root.text).toContain("Your answers are still here");
+    expect(app.root.text).toContain("Provider unavailable");
     const { payload } = await resultFixture();
     payload.structuredContent.housing.options[0].title =
       '<img src=x onerror="attack()">';
