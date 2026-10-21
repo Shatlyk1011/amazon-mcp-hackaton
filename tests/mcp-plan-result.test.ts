@@ -11,8 +11,11 @@ vi.mock("@/lib/providers/demo-flights", () => ({
   searchFlightConnections: vi.fn(),
 }));
 vi.mock("@/lib/plans/prompt", () => ({ extractRelocationDetails: vi.fn() }));
-vi.mock("@/lib/intake/estimate-expenses", () => ({
-  estimateMovingExpenses: vi.fn(),
+const parseEstimates = vi.hoisted(() => vi.fn());
+vi.mock("openai", () => ({
+  default: class {
+    responses = { parse: parseEstimates };
+  },
 }));
 import {
   Client,
@@ -24,7 +27,7 @@ import { searchHousing } from "@/lib/providers/rentcast";
 import { searchMovingServices } from "@/lib/providers/tomtom-search";
 import { searchFlightConnections } from "@/lib/providers/demo-flights";
 import { extractRelocationDetails } from "@/lib/plans/prompt";
-import { estimateMovingExpenses } from "@/lib/intake/estimate-expenses";
+import { testExpenseEstimates } from "./fixtures/estimates";
 import { generatePlan } from "@/lib/plans/generate";
 import { demoFamily, type Housing } from "@/lib/relocation";
 import { beginIntake, completeIntake, intakeView } from "@/lib/intake/engine";
@@ -36,7 +39,10 @@ import {
 } from "@/lib/intake/plan-result";
 import { quizHtml, resultResourceUri } from "@/lib/intake/quiz-app";
 
-const state = beginIntake({ ...demoFamily, otherNeeds: "No other needs" });
+const state = {
+  ...beginIntake({ ...demoFamily, otherNeeds: "No other needs" }),
+  expenseEstimates: testExpenseEstimates,
+};
 const fetchedAt = "2026-10-20T12:00:00Z";
 const home = (id: string, rent = 2800, bedrooms = 2): Housing => ({
   id,
@@ -55,7 +61,10 @@ const home = (id: string, rent = 2800, bedrooms = 2): Housing => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(estimateMovingExpenses).mockResolvedValue(undefined);
+  vi.stubEnv("OPENAI_API_KEY", "fixture");
+  const { source: _source, ...amounts } = testExpenseEstimates;
+  void _source;
+  parseEstimates.mockResolvedValue({ output_parsed: amounts });
   vi.stubEnv("MAPBOX_ACCESS_TOKEN", "");
   vi.mocked(calculateMapboxRoute).mockResolvedValue({
     origin: demoFamily.origin,
@@ -143,6 +152,51 @@ async function resultFixture() {
 }
 
 describe("MoveFlow final result", () => {
+  it("shows saved homes separately with their actual city, unknown availability, and no live readiness credit", async () => {
+    const { result } = await resultFixture();
+    const plan = buildPlanPresentation(
+      {
+        ...result,
+        housingStatus: "unavailable",
+        housingSource: "RentCast · saved snapshot (development data)",
+        housingWarning: "Live rental search is not configured.",
+        housing: [
+          {
+            ...home("stored"),
+            city: "Houston",
+            state: "TX",
+            fetchedAt: "2026-10-15T12:00:00Z",
+          },
+        ],
+      },
+      state,
+    );
+    expect(plan.housing.totalMatches).toBe(0);
+    expect(plan.housing.options).toEqual([]);
+    expect(plan.housing.examples.locations).toEqual(["Houston, TX"]);
+    expect(plan.housing.examples.options[0]).toMatchObject({
+      availability: "Unknown",
+      fetchedAt: "2026-10-15T12:00:00Z",
+    });
+    expect(
+      plan.readiness.blockers.some(
+        (blocker) => blocker.id === "housing-options",
+      ),
+    ).toBe(true);
+    const app = appHarness();
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: { structuredContent: plan },
+    });
+    expect(app.root.text).toContain("Saved rental examples · Houston, TX");
+    expect(app.root.text).toContain(
+      "not live matches for " + plan.move.destination,
+    );
+    expect(app.root.text).toContain("Live rental search is not configured.");
+    expect(app.root.text).toContain("2026-10-15");
+    expect(app.root.text).not.toContain("0 live options");
+  });
   it("generates initial GPT estimates, applies edits, and preserves them on subsequent calls", async () => {
     const client = new Client({ name: "editable-plan-test", version: "1" });
     await client.connect(
@@ -152,6 +206,7 @@ describe("MoveFlow final result", () => {
     );
     try {
       const estimates = {
+        ...testExpenseEstimates,
         source: "model" as const,
         monthlyRent: 1700,
         transportation: 300,
@@ -161,10 +216,12 @@ describe("MoveFlow final result", () => {
         housingFees: 0,
         includeSecurityDeposit: true,
       };
-      vi.mocked(estimateMovingExpenses).mockResolvedValue(estimates);
+      const { source: _source, ...amounts } = estimates;
+      void _source;
+      parseEstimates.mockResolvedValue({ output_parsed: amounts });
       const initial = await client.callTool({
         name: "generate_move_plan",
-        arguments: { state },
+        arguments: { state: { ...state, expenseEstimates: undefined } },
       });
       const first = initial.structuredContent as ReturnType<
         typeof buildPlanPresentation
@@ -176,7 +233,7 @@ describe("MoveFlow final result", () => {
       });
       expect(first.move.maxRent).toBe(demoFamily.maxRent);
       expect(first.state.expenseEstimates).toEqual(estimates);
-      expect(estimateMovingExpenses).toHaveBeenCalledOnce();
+      expect(parseEstimates).toHaveBeenCalledOnce();
       const updated = await client.callTool({
         name: "update_move_plan",
         arguments: {
@@ -240,7 +297,7 @@ describe("MoveFlow final result", () => {
       expect((again.structuredContent as typeof first).budget.recommended).toBe(
         2850,
       );
-      expect(estimateMovingExpenses).toHaveBeenCalledOnce();
+      expect(parseEstimates).toHaveBeenCalledTimes(2);
       const invalid = await client.callTool({
         name: "update_move_plan",
         arguments: {
@@ -281,7 +338,10 @@ describe("MoveFlow final result", () => {
       pets: undefined,
       petFriendly: undefined,
     });
-    const input = completeIntake(missing);
+    const input = completeIntake({
+      ...missing,
+      expenseEstimates: testExpenseEstimates,
+    });
     const plan = buildPlanPresentation(
       {
         ...result,
@@ -518,7 +578,7 @@ function appHarness() {
 }
 
 describe("shipped app bridge", () => {
-  it("previews costs, updates the server with edited preferences, and asks for a new chat summary", async () => {
+  it("updates the embedded plan and future model context without posting into chat", async () => {
     const { payload } = await resultFixture();
     const app = appHarness();
     app.send({
@@ -561,16 +621,25 @@ describe("shipped app bridge", () => {
       id: call.id,
       result: { ...payload, structuredContent: plan },
     });
-    await Promise.resolve();
-    const message = app.messages.find((m) => m.method === "ui/message")!;
-    expect(message.params).toMatchObject({ role: "user" });
-    expect(JSON.stringify(message.params)).toContain("1234");
-    app.send({ jsonrpc: "2.0", id: message.id, result: {} });
     await submitting;
+    expect(app.messages.some((m) => m.method === "ui/message")).toBe(false);
+    const context = app.messages.find(
+      (m) => m.method === "ui/update-model-context",
+    )!;
+    expect(JSON.stringify(context.params)).toContain("1234");
     expect(app.root.querySelector("#cost-transportation")!.value).toBe("1234");
+    expect(app.root.text).toContain("Plan updated ·");
     expect(app.root.text).toContain(
-      "Your changes were sent to the conversation",
+      plan.budget.recommended.toLocaleString("en-US"),
     );
+    // Unsupported context sync does not undo a successful update.
+    app.send({
+      jsonrpc: "2.0",
+      id: context.id,
+      error: { message: "Method not supported" },
+    });
+    await Promise.resolve();
+    expect(app.root.querySelector("button")!.disabled).toBe(false);
   });
   it("keeps edits on tool failure and can retry without rebuilding the form", async () => {
     const { payload } = await resultFixture();

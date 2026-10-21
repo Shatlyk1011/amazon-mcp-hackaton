@@ -1,4 +1,5 @@
 import type { PlanResult } from "@/lib/plans/types";
+import type { Housing } from "@/lib/relocation";
 import {
   assessMoveReadiness,
   buildMoveTimeline,
@@ -155,6 +156,27 @@ export async function buildHousingMap(result: PlanResult) {
 export function buildPlanPresentation(result: PlanResult, state: IntakeState) {
   const { input } = result;
   const matching = matchingHomes(result);
+  const savedExamples =
+    input.needsHousing &&
+    (result.housingStatus !== "live" ||
+      /development/i.test(result.housingSource))
+      ? result.housing.filter(
+          (home) =>
+            home.monthlyRent > 0 &&
+            home.monthlyRent <= input.maxRent &&
+            home.bedrooms >= input.minBedrooms,
+        )
+      : [];
+  const displayHome = (home: Housing) => ({
+    id: short(home.id, 100),
+    title: short(home.title, 150),
+    address: short(home.address, 220),
+    monthlyRent: home.monthlyRent,
+    bedrooms: home.bedrooms,
+    bathrooms: home.bathrooms,
+    availability: home.availability,
+    sourceUrl: safeSourceUrl(home.listingUrl),
+  });
   const movers = result.movers.filter(
     (mover) =>
       result.movingServicesStatus === "live" &&
@@ -234,16 +256,22 @@ export function buildPlanPresentation(result: PlanResult, state: IntakeState) {
       totalMatches: matching.length,
       excludedCount: result.housing.length - matching.length,
       browseUrl: safeSourceUrl(result.housingBrowseUrl),
-      options: matching.slice(0, MAX_OPTIONS).map((home) => ({
-        id: short(home.id, 100),
-        title: short(home.title, 150),
-        address: short(home.address, 220),
-        monthlyRent: home.monthlyRent,
-        bedrooms: home.bedrooms,
-        bathrooms: home.bathrooms,
-        availability: home.availability,
-        sourceUrl: safeSourceUrl(home.listingUrl),
-      })),
+      options: matching.slice(0, MAX_OPTIONS).map(displayHome),
+      examples: {
+        total: savedExamples.length,
+        locations: [
+          ...new Set(
+            savedExamples
+              .map((home) => [home.city, home.state].filter(Boolean).join(", "))
+              .filter(Boolean),
+          ),
+        ].slice(0, MAX_OPTIONS),
+        options: savedExamples.slice(0, MAX_OPTIONS).map((home) => ({
+          ...displayHome(home),
+          availability: "Unknown" as const,
+          fetchedAt: home.fetchedAt,
+        })),
+      },
     },
     movers: {
       status: /development/i.test(result.movingServicesSource)
@@ -319,6 +347,11 @@ export function movePlanText(plan: MovePlanPresentation) {
           `${home.title}: ${dollars(home.monthlyRent)}/month, ${home.bedrooms} bedrooms. ${home.sourceUrl ?? "Confirm with provider."}`,
       ),
     `Housing source: ${plan.housing.source} (${plan.housing.status}), checked ${plan.housing.fetchedAt}. ${plan.housing.warning}`,
+    ...(plan.housing.examples.total
+      ? [
+          `Saved rental examples: ${plan.housing.examples.total} stored listings in ${plan.housing.examples.locations.join("; ") || "the saved dataset"}. These are not live matches for ${plan.move.destination}; current availability is unknown.`,
+        ]
+      : []),
     `Moving services: ${plan.movers.totalOptions} live options. Source: ${plan.movers.source} (${plan.movers.status}). ${plan.movers.warning}`,
     ...(plan.flights
       ? [
@@ -336,7 +369,7 @@ export function movePlanText(plan: MovePlanPresentation) {
     `Next action: ${plan.readiness.nextAction}`,
     ...plan.timeline.timeline.map((task) => `${task.dueDate}: ${task.title}`),
     ...plan.assumptions,
-    "Edit the expenses or move preferences in the app and select Update my relocation plan to refresh. This plan has not been saved to an account.",
+    "Edit the expenses or move preferences in the app and select Update plan to refresh in place. This plan has not been saved to an account.",
   ]
     .filter(Boolean)
     .join("\n");

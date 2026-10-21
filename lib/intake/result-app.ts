@@ -1,7 +1,7 @@
 // Shared by the intake resource and direct generate_move_plan resource.
 export const resultStyles = String.raw`
-main:has(.plan){max-width:1040px}.plan{--line:color-mix(in srgb,CanvasText 18%,transparent);--muted:color-mix(in srgb,CanvasText 65%,Canvas);--accent:#286aa8}
-.plan h1{font-family:Geist,Arial,sans-serif;font-size:clamp(26px,5vw,40px);font-weight:600;letter-spacing:-.035em;margin:8px 0 12px;overflow-wrap:anywhere}
+main:has(.plan){max-width:1040px}.plan{font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;--line:color-mix(in srgb,CanvasText 18%,transparent);--muted:color-mix(in srgb,CanvasText 65%,Canvas);--accent:#286aa8}
+.plan h1{font-family:inherit;font-size:clamp(24px,4vw,32px);font-weight:600;letter-spacing:-.035em;margin:8px 0 12px;overflow-wrap:anywhere}
 .plan h2{font-size:19px;margin:0 0 12px}.plan h3{font-size:15px;margin:0 0 8px}
 .plan section{margin-top:26px;border-top:1px solid var(--line);padding-top:20px}
 .plan p{opacity:1;color:var(--muted);font-size:14px}.plan .briefing{font-size:16px;line-height:1.6;color:inherit;max-width:74ch}
@@ -12,7 +12,7 @@ main:has(.plan){max-width:1040px}.plan{--line:color-mix(in srgb,CanvasText 18%,t
 .plan table{width:100%;border-collapse:collapse;text-align:left;font-size:13px}.plan th{background:color-mix(in srgb,var(--accent) 7%,Canvas);font-weight:650}.plan td,.plan th{padding:12px;vertical-align:top;border-bottom:1px solid var(--line)}.plan tr:last-child td{border:0}.plan td:first-child{min-width:165px}.plan td small{display:block;margin-top:4px;color:var(--muted)}
 .plan a{color:var(--color-text-link,light-dark(#286aa8,#75b8ff));text-underline-offset:3px}.plan .notice{border-left:3px solid #ad7921;padding:10px 14px;background:color-mix(in srgb,#ad7921 8%,Canvas);border-radius:0 8px 8px 0}
 .plan .columns{display:grid;grid-template-columns:1fr 1fr;gap:24px}.plan .columns section{min-width:0}.plan .checklist{padding:0;list-style:none;display:grid;gap:12px}.plan .checklist li{padding-left:15px;border-left:2px solid var(--line);font-size:14px;line-height:1.5}.plan .checklist time{display:block;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
-.plan details{margin-top:24px;padding:16px;border:1px solid var(--line);border-radius:10px}.plan summary{cursor:pointer;font-weight:650}.plan details ul{padding-left:20px;font-size:13px;line-height:1.6}.plan .strategy{padding:12px 0}.plan .strategy+ .strategy{border-top:1px solid var(--line)}.plan .empty{padding:18px;border:1px dashed var(--line);border-radius:10px}.plan footer{font-size:12px;color:var(--muted);margin:24px 0 8px}
+.plan details{margin-top:24px;padding:16px;border:1px solid var(--line);border-radius:10px}.plan summary{cursor:pointer;font-size:13px;font-weight:550}.plan details ul{padding-left:20px;font-size:13px;line-height:1.6}.plan .strategy{padding:12px 0}.plan .strategy+ .strategy{border-top:1px solid var(--line)}.plan .empty{padding:18px;border:1px dashed var(--line);border-radius:10px}.plan footer{font-size:12px;color:var(--muted);margin:24px 0 8px}
 @media(max-width:600px){.plan .columns{grid-template-columns:1fr;gap:0}.plan .metrics{gap:8px}.plan .metric{padding-left:8px}.plan td,.plan th{padding:9px}}
 `;
 
@@ -59,12 +59,19 @@ export const resultRenderer = String.raw`
       if(plan.flights.isDemoData)flights.append(element('p','Fictional schedules and availability.','caption'));
     }
     const housing=section('Homes to compare');
-    housing.append(element('p',plan.move.needsHousing?plan.housing.totalMatches+' live options within '+money(plan.move.maxRent)+'/month and at least '+plan.move.minBedrooms+' bedroom(s). Showing up to 8.':'You said housing is already arranged.'));
+    const bedroomFilter=plan.move.minBedrooms>0?' · '+plan.move.minBedrooms+'+ bedrooms':' · Any bedrooms';
+    housing.append(element('p',plan.move.needsHousing?money(plan.move.maxRent)+'/month maximum'+bedroomFilter:'You said housing is already arranged.'));
+    if(plan.move.needsHousing&&plan.housing.status!=='live')housing.append(element('p',plan.housing.warning||'Live rental search is currently unavailable.','notice'));
+    else if(plan.move.needsHousing)housing.append(element('p',plan.housing.totalMatches+' matching listings · Showing up to 8.','caption'));
     if(meta?.housingMap)mapView(housing,meta.housingMap,'Rental locations in '+plan.move.destination+'; marker numbers match the table');
     if(plan.housing.options.length){
       table(housing,['Home / address','Monthly rent','Beds / baths','Availability','Source'],plan.housing.options.map((home,i)=>{const name=element('div',(i+1)+'. '+home.title);name.append(element('small',home.address));return [name,money(home.monthlyRent),home.bedrooms+' / '+home.bathrooms,home.availability,sourceLink('Search address',home.sourceUrl)];}));
-    }else housing.append(element('p',plan.move.needsHousing?'No verified matching rentals are available in this result. Adjust your requirements or check current listings.':'Rental search was not requested.','empty'));
-    if(plan.housing.excludedCount)housing.append(element('p',plan.housing.excludedCount+' sample or out-of-criteria rentals were excluded.'));
+    }else housing.append(element('p',plan.move.needsHousing?plan.housing.status==='live'?'No rentals match these requirements. Try a higher rent ceiling or fewer bedrooms.':'No live rental matches are available. Browse current listings below.':'Rental search was not requested.','empty'));
+    if(plan.housing.examples?.options.length){
+      const examples=element('details');examples.open=true;examples.append(element('summary','Saved rental examples · '+(plan.housing.examples.locations.join(', ')||'Stored listings')));
+      examples.append(element('p','These saved listings are not live matches for '+plan.move.destination+'. Prices and availability have not been refreshed.','caption'));
+      table(examples,['Saved home / address','Stored rent','Beds / baths','Last recorded'],plan.housing.examples.options.map(home=>{const name=element('div',home.title);name.append(element('small',home.address));return[name,money(home.monthlyRent),home.bedrooms+' / '+home.bathrooms,home.fetchedAt?.slice(0,10)||'Unknown'];}));housing.append(examples);
+    }
     housing.append(element('p','Pet policies, fees, move-in dates, and availability need confirmation. Address links open rental searches, not verified listing pages.'));
     if(plan.move.needsHousing&&plan.housing.browseUrl)housing.append(sourceLink('Browse rentals in '+plan.move.destination,plan.housing.browseUrl));
     const columns=element('div','','columns');page.append(columns);

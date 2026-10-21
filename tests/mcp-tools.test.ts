@@ -1,5 +1,15 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
+vi.mock("openai", async () => {
+  const { testExpenseEstimates } = await import("./fixtures/estimates");
+  const { source: _source, ...amounts } = testExpenseEstimates;
+  void _source;
+  return {
+    default: class {
+      responses = { parse: async () => ({ output_parsed: amounts }) };
+    },
+  };
+});
 import {
   Client,
   StreamableHTTPClientTransport,
@@ -15,6 +25,7 @@ const fullState = beginIntake(
 );
 
 afterEach(() => vi.unstubAllEnvs());
+beforeEach(() => vi.stubEnv("OPENAI_API_KEY", "fixture"));
 
 function fixtureHousing(id: string, monthlyRent: number) {
   return {
@@ -240,10 +251,10 @@ describe("public MCP standalone contracts", () => {
         (tool) => tool.name === "prepare_move_intake",
       );
       expect(prepare?._meta?.ui).toEqual({
-        resourceUri: "ui://moveflow/quiz-v3.html",
+        resourceUri: "ui://moveflow/quiz-v4.html",
       });
       const resource = await client.readResource({
-        uri: "ui://moveflow/quiz-v3.html",
+        uri: "ui://moveflow/quiz-v4.html",
       });
       expect(resource.contents[0]).toMatchObject({
         mimeType: "text/html;profile=mcp-app",

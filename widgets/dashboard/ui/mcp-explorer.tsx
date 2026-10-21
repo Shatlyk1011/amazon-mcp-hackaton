@@ -38,7 +38,7 @@ export function McpActivity({ traces }: { traces: Trace[] }) {
             Execution activity
           </span>
         </div>
-        <CardTitle>MCP servers</CardTitle>
+        <CardTitle>MCP tools</CardTitle>
         <CardDescription>
           {traces.length
             ? `${completed} of ${traces.length} calls completed`

@@ -11,6 +11,7 @@ export function BudgetPanel({
   input: RelocationInput;
 }) {
   if (!budget) return null;
+
   const rows = [
     ["Housing upfront", budget.housingUpfront],
     ["Transportation", budget.transportation],
@@ -21,7 +22,7 @@ export function BudgetPanel({
     <Card className="rounded-xl bg-white shadow-[0_1px_1px_rgba(0,0,0,0.04)] ring-[#ebebeb]">
       <CardHeader className="flex-row items-start justify-between">
         <div>
-          <CardTitle>Budget pulse</CardTitle>
+          <CardTitle>Budget calculation</CardTitle>
           <p className="text-sm text-muted-foreground">
             One-time costs · rent stays separate
           </p>
@@ -61,22 +62,6 @@ export function BudgetPanel({
             >
               <span className="text-muted-foreground">{label}</span>
               <span className="font-medium">{money(amount)}</span>
-            </div>
-          ))}
-        </div>
-        <div className="mt-5 grid grid-cols-3 gap-2 border-t pt-4 text-center">
-          {[
-            ["Minimal", budget.minimal],
-            ["Comfortable", budget.recommended],
-            ["Full-service", budget.fullService],
-          ].map(([label, amount]) => (
-            <div key={label}>
-              <div className="text-[10px] uppercase text-muted-foreground">
-                {label}
-              </div>
-              <div className="mt-1 text-sm font-semibold">
-                {money(amount as number)}
-              </div>
             </div>
           ))}
         </div>

@@ -22,7 +22,7 @@ import {
 } from "./schema";
 import { continueIntake, getRentGuidance, prepareIntake } from "./service";
 import { quizHtml, quizResourceUri, resultResourceUri } from "./quiz-app";
-import { estimateMovingExpenses } from "./estimate-expenses";
+import { invalidateMovingEstimates } from "./estimate-expenses";
 
 const annotations = {
   readOnlyHint: true,
@@ -63,11 +63,8 @@ async function generateMoveResult(
     const view = intakeView(latest);
     if (!view.ready)
       return output(async () => ({ status: "needs_input", ...view }));
-    if (!latest.expenseEstimates)
-      latest.expenseEstimates = await estimateMovingExpenses(
-        completeIntake(latest),
-      );
     const result = await generatePlan(completeIntake(latest));
+    latest.expenseEstimates = result.input.expenseEstimates;
     const plan = buildPlanPresentation(result, latest);
     const [map, housingMap] = await Promise.all([
       buildPlanMap(result),
@@ -138,7 +135,7 @@ export function registerIntakeTools(server: McpServer) {
             text: quizHtml,
             _meta: {
               "openai/widgetDescription":
-                "MoveFlow renders an editable moving plan: maps, housing, estimated expenses, preferences, timeline, and sources. The Update my relocation plan button refreshes the plan and requests a concise updated chat response.",
+                "MoveFlow renders an editable moving plan: maps, housing, estimated expenses, preferences, timeline, and sources. The Update plan button refreshes this app in place without posting a chat message.",
               ui: { csp: { connectDomains: [], resourceDomains: [] } },
             },
           },
@@ -215,7 +212,7 @@ export function registerIntakeTools(server: McpServer) {
     "generate_move_plan",
     {
       description:
-        "Generate and display the editable MoveFlow moving plan from explicit intake state. Supply estimates with source=model for initial relocation cost assumptions based on the route, household and typical relocation prices. These are labeled GPT planning estimates, never live quotes or verified market averages. Keep estimated monthlyRent separate from the user's maxRent ceiling. Omitted amounts use MoveFlow planning rules. Never invent user facts or overwrite applied user costs. The app lets the user edit expenses and preferences, then call update_move_plan. Returns maps, housing, budget, timeline, services and provider limitations with a text fallback. If essential context is missing, returns needs_input and the next question. Stateless; no database or plan ID required.",
+        "Generate and display the editable MoveFlow moving plan from explicit intake state. Missing expense and strategy estimates are generated with OpenAI using the move details. These are planning estimates, not live quotes or verified market averages. Never invent user facts or overwrite applied user costs. If essential context is missing, returns needs_input and the next question. Stateless; no database or plan ID required.",
       _meta: {
         ui: { resourceUri: resultResourceUri, visibility: ["model", "app"] },
       },
@@ -247,10 +244,14 @@ export function registerIntakeTools(server: McpServer) {
           ? { petFriendly: changes.pets > 0 }
           : {}),
       });
+      if (Object.keys(changes).length)
+        latest.expenseEstimates = invalidateMovingEstimates(
+          state.expenseEstimates,
+        );
       if (changes.pets === 0) delete latest.fields.petInfo;
       if (estimates)
         latest.expenseEstimates = {
-          ...state.expenseEstimates,
+          ...latest.expenseEstimates,
           ...estimates,
           source: "user",
         };

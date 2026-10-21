@@ -7,7 +7,6 @@ import {
   CircleDollarSign,
   Clock3,
   Route,
-  Sparkles,
   Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -93,15 +92,23 @@ export function DashboardPage({
     );
     return () => window.clearTimeout(timeout);
   }, [housingFilters]);
-  const recs = useMemo(() => recommendations(input), [input]);
-  const budget = useMemo(
-    () =>
-      calculateBudget(
+  const recs = useMemo(() => {
+    try {
+      return recommendations(input);
+    } catch {
+      return [];
+    }
+  }, [input]);
+  const budget = useMemo(() => {
+    try {
+      return calculateBudget(
         input,
         housing.find((item) => item.id === selectedHousing),
-      ),
-    [input, housing, selectedHousing],
-  );
+      );
+    } catch {
+      return null;
+    }
+  }, [input, housing, selectedHousing]);
   const filteredHousing = useMemo(() => {
     const minRent = Number(appliedHousingFilters.minRent);
     const maxRent = Number(appliedHousingFilters.maxRent);
@@ -250,12 +257,6 @@ export function DashboardPage({
                   <RouteMap route={route} />
                 </div>
               ) : null}
-              {flightSchedules ? (
-                <div className="flex flex-col gap-4">
-                  <ToolSource tool="suggest_flight_connections" />
-                  <FlightSchedulesPanel schedules={flightSchedules} />
-                </div>
-              ) : null}
               {input.needsHousing ? (
                 <div className="flex flex-col gap-4">
                   <ToolSource tool="search_housing" />
@@ -275,8 +276,32 @@ export function DashboardPage({
                   />
                 </div>
               ) : null}
-
             </div>
+            <div className="mt-10 flex flex-col gap-4">
+              <ToolSource tool="search_moving_services" />
+              <MoverPanel
+                movers={movers}
+                selected={selectedMover}
+                onSelect={onSelectMover}
+                source={movingServicesSource}
+                warning={movingServicesWarning}
+              />
+            </div>
+            {flightSchedules ? (
+              <div className="mt-10 flex flex-col gap-4">
+                <ToolSource tool="suggest_flight_connections" />
+                <FlightSchedulesPanel schedules={flightSchedules} />
+              </div>
+            ) : null}
+            <MoveSetupSummary
+              referenceDate={referenceDate}
+              input={input}
+              route={route}
+              housing={housing}
+              movers={movers}
+              selectedHousing={selectedHousing}
+              selectedMover={selectedMover}
+            />
             <div className="mt-10 flex flex-col gap-4">
               <div>
                 <h2 className="text-2xl font-semibold tracking-[-0.04em]">
@@ -331,28 +356,16 @@ export function DashboardPage({
             <div className="mt-10 grid gap-6">
               <div className="flex flex-col gap-4">
                 <ToolSource tool="calculate_budget" />
-                <BudgetPanel budget={budget} input={input} />
+                {budget ? (
+                  <BudgetPanel budget={budget} input={input} />
+                ) : (
+                  <p>
+                    Estimates are unavailable for this saved plan. Refresh the
+                    plan to generate updated estimates.
+                  </p>
+                )}
               </div>
             </div>
-            <div className="mt-10 flex flex-col gap-4">
-              <ToolSource tool="search_moving_services" />
-              <MoverPanel
-                movers={movers}
-                selected={selectedMover}
-                onSelect={onSelectMover}
-                source={movingServicesSource}
-                warning={movingServicesWarning}
-              />
-            </div>
-            <MoveSetupSummary
-              referenceDate={referenceDate}
-              input={input}
-              route={route}
-              housing={housing}
-              movers={movers}
-              selectedHousing={selectedHousing}
-              selectedMover={selectedMover}
-            />
             {controls ? <div className="h-20" aria-hidden="true" /> : null}
           </div>
         </div>

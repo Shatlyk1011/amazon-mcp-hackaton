@@ -1,8 +1,8 @@
 import { resultRenderer, resultStyles } from "./result-app";
 import { planEditorRenderer, planEditorStyles } from "./plan-editor";
 
-export const quizResourceUri = "ui://moveflow/quiz-v3.html";
-export const resultResourceUri = "ui://moveflow/plan-v2.html";
+export const quizResourceUri = "ui://moveflow/quiz-v4.html";
+export const resultResourceUri = "ui://moveflow/plan-v3.html";
 
 // A self-contained resource lets MCP Apps hosts render it without fetching assets.
 export const quizHtml = String.raw`<!doctype html>

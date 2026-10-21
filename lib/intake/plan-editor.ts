@@ -1,15 +1,15 @@
 // Runs inside the self-contained MCP App, alongside resultRenderer.
 export const planEditorStyles = String.raw`
-.plan .editor{border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:20px}
-.plan .editor fieldset{min-width:0;gap:16px}.plan .editor legend{font-size:15px}.plan .editor label{font-size:13px;font-weight:550}
+.plan .editor{font-size:13px;line-height:1.5;border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:16px}
+.plan .editor fieldset{min-width:0;gap:16px}.plan .editor legend{font-size:13px;font-weight:600}.plan .editor label{font-size:13px;font-weight:550}
 .plan .editor .control{display:grid;gap:8px}.plan .editor .control-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .plan .editor input.entry,.plan .editor select,.plan .editor textarea{background:Canvas;color:CanvasText;border:1px solid var(--line);border-radius:8px;font:inherit;padding:9px;width:100%;min-width:0}
 .plan .editor .amount{max-width:112px;text-align:right;font-variant-numeric:tabular-nums}
 .plan .editor input[type=range]{width:100%;margin:0;accent-color:CanvasText;cursor:pointer;min-height:24px}
 .plan .editor .check{display:flex;align-items:center;gap:9px}.plan .editor input[type=checkbox]{accent-color:CanvasText;width:17px;height:17px}
-.plan .editor .estimate-total{font-size:28px;font-weight:650;font-variant-numeric:tabular-nums}.plan .editor .caption{margin:0}.plan .editor details{margin:0;padding:12px}.plan .editor details fieldset{margin-top:18px}
+.plan .editor .estimate-total{font-size:26px;font-weight:650;font-variant-numeric:tabular-nums}.plan .editor .caption{margin:0}.plan .editor details{margin:0;padding:10px 12px}.plan .editor details fieldset{margin-top:18px}
 .plan .editor .preferences{display:grid;grid-template-columns:1fr 1fr;gap:14px}.plan .editor .wide{grid-column:1/-1}
-.plan .editor .actions{display:flex;gap:8px;flex-wrap:wrap}.plan .editor button{margin:0}.plan .editor .apply{flex:1;background:CanvasText;color:Canvas}.plan .editor .reset{background:transparent;color:CanvasText;border:1px solid var(--line)}
+.plan .editor .actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.plan .editor button{margin:0;min-height:36px;padding:8px 12px;border-radius:8px;font-size:13px;font-weight:550;line-height:1.25;white-space:nowrap}.plan .editor summary{font-size:13px;font-weight:550;line-height:1.4}.plan .editor .apply{background:CanvasText;color:Canvas}.plan .editor .reset{background:transparent;color:CanvasText;border:1px solid var(--line)}
 .plan .editor .status{font-size:13px;margin:0}.plan .editor :disabled{opacity:.5}.plan .editor .preview{padding-bottom:14px;border-bottom:1px solid var(--line)}
 @media(max-width:420px){.plan .editor{padding:14px}.plan .editor .preferences{grid-template-columns:1fr}}
 `;
@@ -23,7 +23,7 @@ export const planEditorRenderer = String.raw`
     const preview=element('div','','preview'),total=element('div','','estimate-total'),balance=element('p','','caption');
     preview.append(element('div','Estimated upfront cash needed','eyebrow'),total,balance);form.append(preview);
     const source=plan.budget.estimateSource==='model'?'GPT planning estimates':plan.budget.estimateSource==='user'?'Your applied estimates':'MoveFlow planning rules';
-    form.append(element('p',source+'. Editable estimates, not live quotes or verified market averages. Any unspecified costs use MoveFlow planning rules.','caption'));
+    form.append(element('p',source+'. Editable estimates, not live quotes or verified market averages.','caption'));
     const group=element('fieldset');group.append(element('legend','Adjust estimated expenses (USD)'));form.append(group);
     const defaults={monthlyRent:plan.budget.monthlyRent,transportation:plan.budget.transportation,moving:plan.budget.moving,temporaryAccommodation:plan.budget.temporaryAccommodation||0,additional:plan.budget.additional,housingFees:plan.budget.housingFees??250};
     function expense(key,label,max){
@@ -64,7 +64,7 @@ export const planEditorRenderer = String.raw`
     preference('movingDate','Move date','date',plan.move.movingDate);
     preference('budget','Total available budget (USD)','number',plan.budget.budget);
     preference('otherNeeds','Additional preferences','textarea',fields.otherNeeds);
-    const actions=element('div','','actions'),apply=element('button','Update my relocation plan →','apply'),reset=element('button','Reset edits','reset');apply.type='submit';reset.type='button';actions.append(apply,reset);form.append(actions);
+    const actions=element('div','','actions'),apply=element('button','Update plan','apply'),reset=element('button','Reset edits','reset');apply.type='submit';reset.type='button';actions.append(apply,reset);form.append(actions);
     const status=element('p','','status');status.setAttribute('role','status');form.append(status);
     function number(input){return Number(input.value)||0;}
     function refresh(){
@@ -84,20 +84,18 @@ export const planEditorRenderer = String.raw`
       const changes={};
       Object.entries(controls).forEach(([key,input])=>{const value=['furniture','needsHousing'].includes(key)?input.value==='true':['transport','movingDate','otherNeeds'].includes(key)?input.value:number(input);const previous=fields[key]??(key==='transport'?plan.move.transport:key==='suitcases'?2*(plan.move.adults+plan.move.children):'');if(value!==previous)changes[key]=value;});
       const estimates={source:'user',includeSecurityDeposit:deposit.checked};Object.entries(expenses).forEach(([key,input])=>{estimates[key]=number(input);});
-      busy=true;apply.disabled=true;reset.disabled=true;group.disabled=true;preferences.disabled=true;apply.textContent='Updating your plan…';status.textContent='Refreshing housing, expenses and your timeline…';root.querySelector('.error')?.remove();
+      busy=true;apply.disabled=true;reset.disabled=true;group.disabled=true;preferences.disabled=true;apply.textContent='Updating…';status.textContent='Refreshing housing, expenses and your timeline…';root.querySelector('.error')?.remove();
       try{
         const reply=await request('tools/call',{name:'update_move_plan',arguments:{state:plan.state,changes,estimates}});
         update(reply);
         if(reply.structuredContent?.status==='ready'){
           const latest=reply.structuredContent;
-          const message={role:'user',content:[{type:'text',text:'I applied my edits in MoveFlow. The server has already refreshed my relocation plan. Briefly explain the updated costs, budget gap or remaining budget, and next action using this result: '+JSON.stringify({move:latest.move,budget:latest.budget,nextAction:latest.readiness.nextAction,appliedPreferences:changes})}]};
           const latestStatus=root.querySelector('.status');
-          if(latestStatus)latestStatus.textContent='Plan updated. Requesting an updated chat summary…';
-          const share=async()=>{const response=await request('ui/message',message);if(response?.isError)throw new Error('Chat summary unavailable');};
-          try{await share();if(latestStatus)latestStatus.textContent='Plan updated. Your changes were sent to the conversation.';}
-          catch{if(latestStatus){latestStatus.textContent='Plan updated. This host could not update the chat summary. ';const retry=element('button','Retry chat summary','reset');retry.type='button';latestStatus.append(retry);retry.onclick=async()=>{retry.disabled=true;try{await share();latestStatus.textContent='Your changes were sent to the conversation.';}catch{retry.disabled=false;}};}}
+          if(latestStatus)latestStatus.textContent='Plan updated · '+money(latest.budget.recommended)+' total · '+(latest.budget.remaining<0?money(Math.abs(latest.budget.remaining))+' over budget':money(latest.budget.remaining)+' remaining');
+          // Keep future conversation context current without creating a chat turn.
+          request('ui/update-model-context',{content:[{type:'text',text:JSON.stringify({move:latest.move,budget:latest.budget,nextAction:latest.readiness.nextAction})}]}).catch(()=>{});
         }
-      }catch(e){apply.disabled=false;reset.disabled=false;group.disabled=false;preferences.disabled=false;apply.textContent='Retry updating my plan →';status.textContent='Your edits are still here.';showError(e?.message||'The plan could not be updated. Try again.');}
+      }catch(e){apply.disabled=false;reset.disabled=false;group.disabled=false;preferences.disabled=false;apply.textContent='Retry update';status.textContent='Your edits are still here.';showError(e?.message||'The plan could not be updated. Try again.');}
       finally{busy=false;resize();}
     };
     refresh();
