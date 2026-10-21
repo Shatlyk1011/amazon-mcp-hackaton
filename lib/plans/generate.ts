@@ -13,10 +13,26 @@ export async function generatePlan(
   input: RelocationInput,
   selection: { housingId?: string | null; moverId?: string | null } = {},
 ) {
-  input = await withMovingEstimates(input);
   const start = Date.now();
-  const [route, housingResult, flightSchedules] = await Promise.all([
-    input.transport === "fly" ? Promise.resolve(null) : calculateRoute(input),
+  const routePromise =
+    input.transport === "fly" ? Promise.resolve(null) : calculateRoute(input);
+  const moversPromise = routePromise.then((route) =>
+    searchMovingServices({
+      origin: input.origin,
+      destination: input.destination,
+      furniture: input.furniture,
+      originCoordinates: route?.originCoordinates,
+    }),
+  );
+  const [
+    estimatedInput,
+    route,
+    housingResult,
+    flightSchedules,
+    movingServicesResult,
+  ] = await Promise.all([
+    withMovingEstimates(input),
+    routePromise,
     input.needsHousing
       ? searchHousing({
           destination: input.destination,
@@ -41,13 +57,9 @@ export async function generatePlan(
           departureDate: input.movingDate,
           maxStops: 1,
         }),
+    moversPromise,
   ]);
-  const movingServicesResult = await searchMovingServices({
-    origin: input.origin,
-    destination: input.destination,
-    furniture: input.furniture,
-    originCoordinates: route?.originCoordinates,
-  });
+  input = estimatedInput;
   const housing = housingResult.listings;
   const movers = movingServicesResult.movers;
   const selectedHousing = housing.find(
