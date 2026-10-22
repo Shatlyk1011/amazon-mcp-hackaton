@@ -6,7 +6,6 @@ import { PlanHistory } from "@/features/plan-history/plan-history";
 import { LandingPage } from "@/widgets/landing/ui/landing-page";
 import { MoveContext } from "@/features/move-intake/ui/move-context";
 import { MoveIntake } from "@/features/move-intake/ui/move-intake";
-import { TravelModeSelection } from "@/features/move-intake/ui/travel-mode-selection";
 import { Button } from "@/components/ui/button";
 import type {
   IntakeAnswer,
@@ -20,7 +19,6 @@ export default function Home() {
   const [error, setError] = useState<string>();
   const [includeContext, setIncludeContext] = useState(false);
   const [moveContext, setMoveContext] = useState<IntakeFields>({});
-  const [transport, setTransport] = useState<IntakeFields["transport"]>();
   const [intake, setIntake] = useState<SavedIntakeView>();
   const [resumable, setResumable] = useState<SavedIntakeView>();
   const active = useRef(false);
@@ -97,12 +95,10 @@ export default function Home() {
     }
   }
   function begin(prompt: string) {
-    const known = transport ? { transport } : {};
     const input = JSON.stringify({
       prompt,
       includeContext,
       moveContext,
-      known,
     });
     if (attempt.current?.input !== input)
       attempt.current = { input, id: crypto.randomUUID() };
@@ -110,7 +106,6 @@ export default function Home() {
       "/api/intake",
       {
         prompt,
-        known,
         includeContext,
         context: includeContext ? moveContext : undefined,
         requestId: attempt.current.id,
@@ -154,19 +149,12 @@ export default function Home() {
       pending={pending}
       error={error}
       contextControls={
-        <>
-          <TravelModeSelection
-            value={transport}
-            onChange={setTransport}
-            disabled={pending}
-          />
-          <MoveContext
-            included={includeContext}
-            onIncludedChange={setIncludeContext}
-            onContextChange={setMoveContext}
-            disabled={pending}
-          />
-        </>
+        <MoveContext
+          included={includeContext}
+          onIncludedChange={setIncludeContext}
+          onContextChange={setMoveContext}
+          disabled={pending}
+        />
       }
       resumeControl={
         <>
