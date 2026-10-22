@@ -6,6 +6,93 @@ MoveFlow is a relocation planning app with a stateless public MCP server and a p
 - Public MCP endpoint: https://amazon-mcp-hackaton.vercel.app/api/mcp
 - Transport: Streamable HTTP; no client credentials required
 
+## Connect the MCP server
+
+Connect an MCP-compatible assistant on any device to `https://amazon-mcp-hackaton.vercel.app/api/mcp` using Streamable HTTP. No local installation of MoveFlow or client credentials are needed. The deployed server must be reachable from the client.
+
+### Codex CLI and IDE extension
+
+Run on each device:
+
+```bash
+codex mcp add moveflow --url https://amazon-mcp-hackaton.vercel.app/api/mcp
+codex mcp list
+```
+
+Alternatively, add this to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.moveflow]
+url = "https://amazon-mcp-hackaton.vercel.app/api/mcp"
+```
+
+The CLI and IDE extension share this configuration on the same machine. Start a new session and ask, for example, “Use MoveFlow to help me plan a move from Boston to Austin.” See the [Codex MCP setup guide](https://developers.openai.com/learn/docs-mcp).
+
+### Claude Code
+
+Run the following to make MoveFlow available across projects on the device. Omit `--scope user` to configure only the current project.
+
+```bash
+claude mcp add --transport http --scope user moveflow https://amazon-mcp-hackaton.vercel.app/api/mcp
+claude mcp list
+```
+
+Use `/mcp` in Claude Code to check the connection.
+
+### VS Code with GitHub Copilot
+
+Add the server to `.vscode/mcp.json` in the project:
+
+```json
+{
+  "servers": {
+    "moveflow": {
+      "type": "http",
+      "url": "https://amazon-mcp-hackaton.vercel.app/api/mcp"
+    }
+  }
+}
+```
+
+Open Copilot Chat in Agent mode and enable MoveFlow in the tools picker. See the [VS Code MCP configuration reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration) for user-profile configuration.
+
+### Cursor
+
+Add the server to `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "moveflow": {
+      "url": "https://amazon-mcp-hackaton.vercel.app/api/mcp"
+    }
+  }
+}
+```
+
+Restart Cursor and ask its agent to use MoveFlow.
+
+### ChatGPT and cloud agents
+
+In ChatGPT on the web, open **Plugins → + → Add custom MCP server**, name it MoveFlow, enter the endpoint, and select the no-authentication option. Install the resulting plugin and select it in a new chat. Availability depends on account and workspace settings; see [Add a custom MCP server](https://developers.openai.com/api/docs/guides/custom-mcp-server).
+
+Cloud environments need their own MCP configuration and network access to the endpoint; local Codex configuration does not automatically transfer. For the OpenAI Agents API, add the following to `agent.tools` as described in the [MCP connections guide](https://developers.openai.com/api/docs/guides/agents-api/tools/mcp):
+
+```json
+{
+  "type": "mcp",
+  "server_label": "moveflow",
+  "transport": {
+    "type": "http",
+    "server_url": "https://amazon-mcp-hackaton.vercel.app/api/mcp"
+  },
+  "connection_origin": "service",
+  "required": true
+}
+```
+
+Other MCP clients can use the same URL and Streamable HTTP transport; consult the client's documentation for its configuration format. The public server is stateless, so conversations and plan state do not automatically sync between clients. Dashboard plans are scoped to a browser session, and cross-device login is not currently available. Interactive widgets require a host that supports MCP Apps; other hosts can use the tools' text and structured results.
+
 ## Setup
 
 Use Node.js 22+ and pnpm.
@@ -36,6 +123,23 @@ APP_URL=http://localhost:3000
 
 For deployment, set `APP_URL` to the exact HTTPS application origin. The server-side MCP client uses this configured origin, never a model-provided URL or untrusted Host header. It must be reachable by the application's server.
 
+## Sample prompts
+
+Start a move in the app or an MCP-compatible assistant:
+
+- “I’m moving from New York, NY to Texas. Help me plan the move.”
+- “Help me relocate from Boston to Austin with my partner and our dog. We need a two-bedroom rental.”
+- “I’m moving from Seattle to Denver. My monthly rent limit is $1,800.”
+
+After creating a saved dashboard, use **Refine this plan** for follow-ups:
+
+- “Lower my monthly rent limit to $1,800 and find new options.”
+- “Compare the first two apartments without changing my plan.”
+- “Explain what is included in my moving budget.”
+- “Select the first apartment.”
+
+The interview asks for missing details before generating a plan. Results depend on the configured providers; fictional flight examples are not bookable.
+
 ## MCP tools and response contract
 
 - `prepare_move_intake`: extract known facts and return the interview state and next question. Structured `known` values work without OpenAI; saved context is used only when explicitly enabled.
@@ -45,7 +149,7 @@ For deployment, set `APP_URL` to the exact HTTPS application origin. The server-
 - `update_move_plan`: apply preferences and expense edits to caller-owned state and regenerate the plan. User-supplied estimates persist in that state.
 - Other tools provide route, housing, mover and budget calculations, comparisons, readiness, timeline, destination essentials, and briefings. `draft_relocation_plan` and `preview_relocation_selection` are non-persistent. Use `tools/list` for the full schemas.
 
-MCP hosts can pass relevant facts the user previously shared (for example, adult, child and pet counts) as `savedContext` with `includeContext: true` when calling `prepare_move_intake`. Put facts from the current request in `known`; they take precedence. The intake tracks the source of each fact, asks for missing details, and carries the resulting state into plan generation. The public server cannot access a host's conversation, memory or browser profile on its own: the host must select and send applicable facts, and host behavior may vary.
+MCP hosts can pass relevant facts the user previously shared (for example, adult, child and pet counts) as `savedContext` with `includeContext: true` when calling `prepare_move_intake`. Put facts from the current request in `known`; they take precedence. The intake tracks the source of each fact, asks for missing details, and carries the resulting state into plan generation. The public server cannot access a host's conversation, memory or browser profile on its own: the host must select and send applicable facts, and host behavior may vary. In the browser app, users can opt in to **Include my move context** to use their saved profile for an intake; the current request takes precedence.
 
 `prepare_move_intake` advertises `ui://moveflow/quiz-v4.html`; `generate_move_plan` advertises `ui://moveflow/plan-v3.html`. The quiz calls the intake and plan tools directly. The plan widget calls `update_move_plan` and synchronizes context when supported.
 
