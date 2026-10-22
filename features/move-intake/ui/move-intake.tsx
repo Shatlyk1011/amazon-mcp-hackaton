@@ -20,6 +20,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { states, stateOnly } from "@/lib/intake/cities";
 import type { IntakeAnswer, SavedIntakeView } from "@/lib/intake/schema";
 
 export const factLabels: Record<string, string> = {
@@ -74,6 +75,45 @@ export function MoveIntake({
   const [incomeQuestions, setIncomeQuestions] = useState<Set<string>>(
     new Set(),
   );
+  const [cityStates, setCityStates] = useState<Record<string, string>>({});
+  const [citySuggestions, setCitySuggestions] = useState<
+    Record<string, string[]>
+  >({});
+  const [loadingCities, setLoadingCities] = useState<Record<string, boolean>>(
+    {},
+  );
+  const cityRequests = useRef<Record<string, number>>({});
+  async function selectCityState(questionId: string, state: string) {
+    setCityStates((current) => ({ ...current, [questionId]: state }));
+    updateAnswer(questionId, {});
+    const request = (cityRequests.current[questionId] ?? 0) + 1;
+    cityRequests.current[questionId] = request;
+    setCitySuggestions((current) => ({ ...current, [questionId]: [] }));
+    setLoadingCities((current) => ({
+      ...current,
+      [questionId]: Boolean(state),
+    }));
+    if (!state) return;
+    try {
+      const response = await fetch("/api/intake/city-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state }),
+      });
+      if (!response.ok) throw new Error("Could not load suggestions");
+      const data: { cities: string[] } = await response.json();
+      if (cityRequests.current[questionId] === request)
+        setCitySuggestions((current) => ({
+          ...current,
+          [questionId]: data.cities,
+        }));
+    } catch {
+      // The user can always enter a city manually.
+    } finally {
+      if (cityRequests.current[questionId] === request)
+        setLoadingCities((current) => ({ ...current, [questionId]: false }));
+    }
+  }
   const heading = useRef<HTMLHeadingElement>(null);
   const questions = intake.questions;
   const needsHousingAnswer = answers.housing?.choice;
@@ -171,6 +211,19 @@ export function MoveIntake({
                 {visibleQuestions.map((question, index) => {
                   const answer = answers[question.id];
                   const incomeMode = incomeQuestions.has(question.id);
+                  const needsCityState =
+                    ["origin", "destination"].includes(question.id) &&
+                    !stateOnly(
+                      intake.state.fields[
+                        question.id as "origin" | "destination"
+                      ],
+                    );
+                  const cityOptions = citySuggestions[question.id] ?? [];
+                  const customState =
+                    needsCityState && Boolean(cityStates[question.id]);
+                  const options = customState
+                    ? cityOptions.map((city) => ({ id: city, label: city }))
+                    : question.options;
                   const value = incomeMode
                     ? String(answer?.monthlyIncome ?? "")
                     : (answer?.text ?? "");
@@ -186,7 +239,43 @@ export function MoveIntake({
                         {question.description}
                       </p>
                       <FieldGroup>
-                        {question.options.length > 0 && !incomeMode ? (
+                        {needsCityState ? (
+                          <Field>
+                            <FieldLabel htmlFor={`state-${question.id}`}>
+                              State for city suggestions
+                            </FieldLabel>
+                            <select
+                              id={`state-${question.id}`}
+                              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                              value={cityStates[question.id] ?? ""}
+                              disabled={pending}
+                              onChange={(event) => {
+                                void selectCityState(
+                                  question.id,
+                                  event.target.value,
+                                );
+                              }}
+                            >
+                              <option value="">
+                                Select a state (optional)
+                              </option>
+                              {states.map((state) => (
+                                <option
+                                  key={state.abbreviation}
+                                  value={state.abbreviation}
+                                >
+                                  {state.name}
+                                </option>
+                              ))}
+                            </select>
+                            {loadingCities[question.id] ? (
+                              <FieldDescription>
+                                Loading city suggestions…
+                              </FieldDescription>
+                            ) : null}
+                          </Field>
+                        ) : null}
+                        {options.length > 0 && !incomeMode ? (
                           <Field>
                             <FieldLabel id={`${question.id}-answers-label`}>
                               Choose an answer
@@ -196,15 +285,24 @@ export function MoveIntake({
                               variant="outline"
                               orientation="vertical"
                               className="w-full"
-                              value={answer?.choice ? [answer.choice] : []}
+                              value={
+                                answer?.choice
+                                  ? [answer.choice]
+                                  : needsCityState &&
+                                      cityOptions.includes(answer?.text ?? "")
+                                    ? [answer!.text!]
+                                    : []
+                              }
                               onValueChange={(values) =>
                                 updateAnswer(question.id, {
-                                  choice: values[0] ?? undefined,
+                                  ...(customState
+                                    ? { text: values[0] ?? undefined }
+                                    : { choice: values[0] ?? undefined }),
                                 })
                               }
                               disabled={pending}
                             >
-                              {question.options.map((option) => (
+                              {options.map((option) => (
                                 <ToggleGroupItem
                                   key={option.id}
                                   value={option.id}
@@ -220,7 +318,7 @@ export function MoveIntake({
                           <FieldLabel htmlFor={`answer-${question.id}`}>
                             {incomeMode
                               ? "Monthly take-home income ($)"
-                              : question.options.length
+                              : options.length
                                 ? "Or type your own answer"
                                 : "Your answer"}
                           </FieldLabel>
