@@ -13,18 +13,18 @@ export function BudgetPanel({
   if (!budget) return null;
 
   const rows = [
-    ["Housing upfront", budget.housingUpfront],
-    ["Transportation", budget.transportation],
+    ["Starting housing costs", budget.housingUpfront],
+    ["Travel", budget.transportation],
     ["Moving services", budget.moving],
-    ["Packing + pets", budget.additional],
+    ["Other costs", budget.additional],
   ] as const;
   return (
     <Card className="rounded-xl bg-white shadow-[0_1px_1px_rgba(0,0,0,0.04)] ring-[#ebebeb]">
       <CardHeader className="flex-row items-start justify-between">
         <div>
-          <CardTitle>Budget calculation</CardTitle>
+          <CardTitle>Estimated moving costs</CardTitle>
           <p className="text-sm text-muted-foreground">
-            One-time costs · rent stays separate
+            One-time costs · monthly rent is separate
           </p>
         </div>
         <CircleDollarSign className="size-5 text-[#0070f3]" />
@@ -32,28 +32,30 @@ export function BudgetPanel({
       <CardContent>
         <div className="flex items-end justify-between">
           <div>
-            <div className="text-xs text-muted-foreground">
-              RECOMMENDED ESTIMATE
-            </div>
+            <div className="text-xs text-muted-foreground">ESTIMATED TOTAL</div>
             <div className="mt-1 text-4xl font-semibold tracking-[-0.04em]">
               {money(budget.recommended)}
             </div>
           </div>
           <div
-            className={`text-right text-sm font-semibold ${budget.remaining >= 0 ? "text-[#0070f3]" : "text-[#ee0000]"}`}
+            className={`text-right text-sm font-semibold ${budget.remaining === null ? "text-muted-foreground" : budget.remaining >= 0 ? "text-[#0070f3]" : "text-[#ee0000]"}`}
           >
-            {budget.remaining >= 0
-              ? `${money(budget.remaining)} left`
-              : `${money(Math.abs(budget.remaining))} over`}
+            {budget.remaining === null
+              ? "Budget not provided"
+              : budget.remaining >= 0
+                ? `${money(budget.remaining)} left`
+                : `${money(Math.abs(budget.remaining))} over`}
           </div>
         </div>
-        <Progress
-          value={Math.min(
-            100,
-            Math.max(12, (budget.recommended / input.budget) * 100),
-          )}
-          className="mt-5"
-        />
+        {input.budget !== undefined && input.budget > 0 ? (
+          <Progress
+            value={Math.min(
+              100,
+              Math.max(12, (budget.recommended / input.budget) * 100),
+            )}
+            className="mt-5"
+          />
+        ) : null}
         <div className="mt-5 flex flex-col gap-3">
           {rows.map(([label, amount]) => (
             <div

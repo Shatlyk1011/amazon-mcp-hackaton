@@ -64,7 +64,7 @@ export function buildMoveTimeline(
   const tasks = [
     {
       id: "confirm-plan",
-      title: "Confirm the moving budget and household requirements",
+      title: "Check your moving budget and what your family needs",
       dueDate: shiftDate(input.movingDate, -56),
       category: "planning",
     },
@@ -72,7 +72,7 @@ export function buildMoveTimeline(
       ? [
           {
             id: "choose-housing",
-            title: "Compare housing and choose a destination home",
+            title: "Compare homes and choose one in your new city",
             dueDate: shiftDate(input.movingDate, -42),
             category: "housing",
           },
@@ -82,7 +82,7 @@ export function buildMoveTimeline(
       ? [
           {
             id: "choose-mover",
-            title: "Compare moving services and confirm availability",
+            title: "Compare moving companies and check if they are available",
             dueDate: shiftDate(input.movingDate, -35),
             category: "moving",
           },
@@ -96,13 +96,13 @@ export function buildMoveTimeline(
     },
     {
       id: "utilities-address",
-      title: "Schedule utilities and prepare address changes",
+      title: "Set up utilities and plan your address change",
       dueDate: shiftDate(input.movingDate, -14),
       category: "settling-in",
     },
     {
       id: "essentials",
-      title: "Save nearby essentials for the first week",
+      title: "Find nearby places you will need in your first week",
       dueDate: shiftDate(input.movingDate, -10),
       category: "settling-in",
     },
@@ -171,7 +171,7 @@ export function assessMoveReadiness(raw: ReadinessSnapshot) {
       label: "Housing options available",
       ready: !snapshot.input.needsHousing || snapshot.housingOptionsAvailable,
       weight: 15,
-      action: "Search for housing that matches the saved requirements.",
+      action: "Find homes that match what you need.",
     },
     {
       id: "housing-selection",
@@ -179,28 +179,31 @@ export function assessMoveReadiness(raw: ReadinessSnapshot) {
       ready:
         !snapshot.input.needsHousing || Boolean(snapshot.selectedHousingId),
       weight: 25,
-      action: "Compare the strongest housing options and choose one.",
+      action: "Compare homes and choose one.",
     },
     {
       id: "moving-options",
       label: "Moving services available",
       ready: !snapshot.input.furniture || snapshot.movingServicesAvailable,
       weight: 10,
-      action: "Find moving services near the origin.",
+      action: "Find moving companies near your starting city.",
     },
     {
       id: "mover-selection",
       label: "Moving service decision made",
       ready: !snapshot.input.furniture || Boolean(snapshot.selectedMoverId),
       weight: 15,
-      action: "Compare moving services and choose a preferred provider.",
+      action: "Compare moving companies and choose one.",
     },
     {
       id: "budget",
-      label: "Recommended estimate fits the budget",
-      ready: budget.remaining >= 0,
+      label: "Estimated cost fits your budget",
+      ready: budget.remaining !== null && budget.remaining >= 0,
       weight: 20,
-      action: `Close the ${Math.abs(budget.remaining).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })} budget gap or revise the plan.`,
+      action:
+        budget.remaining === null
+          ? "Add your budget to compare it with the estimated cost."
+          : `Close the ${Math.abs(budget.remaining).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })} budget gap or revise the plan.`,
     },
   ];
   const score = checks.reduce(
@@ -257,13 +260,11 @@ export function compareHousingOptions(
         score += 15;
         strengths.push("Listed as available");
       } else {
-        tradeoffs.push("Availability needs confirmation");
+        tradeoffs.push("Check if it is available");
       }
       if (option.address.trim()) score += 5;
       if (input.petFriendly)
-        tradeoffs.push(
-          "Pet policy must be confirmed with the listing provider",
-        );
+        tradeoffs.push("Check the pet rules with the listing provider");
       return { ...option, score, strengths, tradeoffs };
     })
     .sort((a, b) => b.score - a.score || a.monthlyRent - b.monthlyRent)
@@ -279,14 +280,16 @@ export function createMoveBriefing(
   const countdown = timeline.daysUntilMove;
   const countdownText =
     countdown > 0
-      ? `${countdown} days remain until the move.`
+      ? `${countdown} days until your move.`
       : countdown === 0
         ? "Today is move day."
         : `The saved move date passed ${Math.abs(countdown)} days ago.`;
   const budgetText =
-    readiness.budget.remaining >= 0
-      ? `$${readiness.budget.remaining.toLocaleString("en-US")} remains after the recommended estimate.`
-      : `The recommended estimate is $${Math.abs(readiness.budget.remaining).toLocaleString("en-US")} over budget.`;
+    readiness.budget.remaining === null
+      ? "Add your budget to see how it compares with the estimated cost."
+      : readiness.budget.remaining >= 0
+        ? `$${readiness.budget.remaining.toLocaleString("en-US")} is left after the estimated cost.`
+        : `The estimated cost is $${Math.abs(readiness.budget.remaining).toLocaleString("en-US")} over budget.`;
 
   return {
     summary: `${countdownText} The plan is ${readiness.score}% ready. ${budgetText}`,

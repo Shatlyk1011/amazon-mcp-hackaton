@@ -53,7 +53,7 @@ export function MoveSetupSummary({
             <CardTitle>What this plan is based on</CardTitle>
             <CardDescription>
               {context.includedSavedContext
-                ? "Your request, included saved context, and move-setup answers."
+                ? "Your request, saved details, and setup answers."
                 : "Your request and move-setup answers."}
             </CardDescription>
           </CardHeader>
@@ -77,7 +77,7 @@ export function MoveSetupSummary({
             </dl>
             <details>
               <summary className="cursor-pointer text-sm font-medium">
-                Assumptions and information sources
+                Estimates and information sources
               </summary>
               <div className="mt-3 flex flex-col gap-3 text-sm text-muted-foreground">
                 <ul className="list-disc pl-4">
@@ -92,7 +92,7 @@ export function MoveSetupSummary({
                       (s) => s === "request",
                     ).length
                   }{" "}
-                  facts · Saved context:{" "}
+                  facts · Saved details:{" "}
                   {
                     Object.values(context.sources).filter(
                       (s) => s === "saved_context",
@@ -107,7 +107,7 @@ export function MoveSetupSummary({
                 </p>
                 {context.rentEvidence ? (
                   <p>
-                    Rent guidance: {context.rentEvidence.source},{" "}
+                    Rent information: {context.rentEvidence.source},{" "}
                     {context.rentEvidence.sampleSize} listings in{" "}
                     {context.rentEvidence.destination}, checked{" "}
                     {context.rentEvidence.fetchedAt.slice(0, 10)}.{" "}
@@ -129,8 +129,8 @@ export function MoveSetupSummary({
             {schedule.daysUntilMove >= 0
               ? `${schedule.daysUntilMove} days until your planned move.`
               : "Your planning date has passed; update it to revise the schedule."}{" "}
-            Readiness reflects available information and selections, not
-            confirmed bookings.
+            This score is based on the information and choices in your plan. It
+            does not mean anything is booked.
           </CardDescription>
         </CardHeader>
         <CardContent>

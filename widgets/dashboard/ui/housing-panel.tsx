@@ -103,10 +103,16 @@ export function HousingPanel({
           </CardDescription>
           <div className="mt-4 grid grid-cols-3 gap-3 border-t border-[#ebebeb] pt-4">
             {[
-              ["Avg. rent", averageRent ? money(Math.round(averageRent)) : "—"],
-              ["Avg. beds", averageBedrooms ? averageBedrooms.toFixed(1) : "—"],
               [
-                "Avg. baths",
+                "Average rent",
+                averageRent ? money(Math.round(averageRent)) : "—",
+              ],
+              [
+                "Average beds",
+                averageBedrooms ? averageBedrooms.toFixed(1) : "—",
+              ],
+              [
+                "Average baths",
                 averageBathrooms ? averageBathrooms.toFixed(1) : "—",
               ],
             ].map(([label, value]) => (
@@ -135,7 +141,7 @@ export function HousingPanel({
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-sm font-medium">
               <SlidersHorizontal className="size-4 text-muted-foreground" />
-              Refine rentals
+              Filter rentals
             </div>
             <span className="text-xs text-muted-foreground">
               {items.length} of {totalItems} listings match
@@ -143,14 +149,14 @@ export function HousingPanel({
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <FilterField
-              label="Min price"
+              label="Lowest price"
               value={filters.minRent}
               min={0}
               onChange={(minRent) => onFiltersChange({ ...filters, minRent })}
               placeholder="$0"
             />
             <FilterField
-              label="Max price"
+              label="Highest price"
               value={filters.maxRent}
               min={0}
               onChange={(maxRent) => onFiltersChange({ ...filters, maxRent })}

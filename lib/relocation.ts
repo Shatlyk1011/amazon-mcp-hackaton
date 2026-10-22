@@ -9,7 +9,7 @@ export const relocationInputSchema = z.object({
   destination: usCitySchema,
   movingDate: z.iso.date(),
   flexible: z.boolean(),
-  budget: z.number().nonnegative(),
+  budget: z.number().nonnegative().optional(),
   adults: z.number().int().positive(),
   children: z.number().int().nonnegative(),
   pets: z.number().int().nonnegative(),
@@ -118,7 +118,7 @@ export function recommendations(input: RelocationInput) {
       explanation: family
         ? "Driving and loading your own truck keeps the cash cost down for a furnished move."
         : "With a couple of suitcases, a full-service mover would add cost without solving a real need.",
-      advantages: ["Lowest upfront cost", "Flexible timing"],
+      advantages: ["Lowest starting cost", "Flexible timing"],
       tradeoffs: ["More hands-on work"],
     },
     {
@@ -130,8 +130,8 @@ export function recommendations(input: RelocationInput) {
       explanation: family
         ? "A truck plus loading help balances control, comfort, and the furniture you need to move."
         : "Compare driving and flying while leaving room in the budget for deposits and setup.",
-      advantages: ["Balanced cost and effort", "Clear contingency"],
-      tradeoffs: ["Requires planning"],
+      advantages: ["Balanced cost and effort", "Room for extra costs"],
+      tradeoffs: ["Needs planning"],
     },
     {
       id: "comfortable",
@@ -161,14 +161,14 @@ export function recommendations(input: RelocationInput) {
         : input.transport === "fly"
           ? [
               "Fly economy",
-              "Fly + coordinate luggage or shipping",
+              "Fly and arrange luggage or shipping",
               "Fly + door-to-door support",
             ][index]
           : strategy.transport,
     explanation:
       input.transport === "compare"
         ? strategy.explanation
-        : `${input.transport === "drive" ? "Driving" : "Flying"} follows your stated travel preference. ${input.furniture ? "Compare transport for your furniture separately." : "Plan around your luggage rather than a full household shipment."} ${strategy.label === "Cheapest" ? "This option prioritizes cost." : strategy.label === "Recommended" ? "This option balances cost and effort." : "This option prioritizes support and comfort."}`,
+        : `${input.transport === "drive" ? "Driving" : "Flying"} matches your travel choice. ${input.furniture ? "Compare ways to move your furniture separately." : "Plan for your luggage instead of a full household move."} ${strategy.label === "Cheapest" ? "This option focuses on keeping costs down." : strategy.label === "Recommended" ? "This option balances cost and effort." : "This option focuses on help and comfort."}`,
   }));
 }
 
@@ -209,7 +209,7 @@ export function calculateBudget(
       temporaryAccommodation,
   );
   return {
-    budget: input.budget,
+    budget: input.budget ?? null,
     minimal: Math.round(housingUpfront + estimates.minimalNonHousing),
     recommended: base,
     fullService: Math.round(housingUpfront + estimates.fullServiceNonHousing),
@@ -223,7 +223,7 @@ export function calculateBudget(
     transportation,
     moving: movingAllowance,
     additional,
-    remaining: input.budget - base,
+    remaining: input.budget === undefined ? null : input.budget - base,
   };
 }
 

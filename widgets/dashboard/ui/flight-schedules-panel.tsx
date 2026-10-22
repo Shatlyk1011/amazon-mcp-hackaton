@@ -20,7 +20,7 @@ export function FlightSchedulesPanel({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
             <Plane aria-hidden="true" />
-            Potential flight routes
+            Flight options
           </CardTitle>
           <Badge
             variant={schedules.status === "live" ? "secondary" : "outline"}
@@ -28,7 +28,7 @@ export function FlightSchedulesPanel({
             {schedules.status === "live"
               ? "Route suggestions"
               : schedules.status === "fallback"
-                ? "Simulated examples"
+                ? "Made-up examples"
                 : "Unavailable"}
           </Badge>
         </div>
@@ -61,7 +61,7 @@ export function FlightSchedulesPanel({
                       : "Example: one-stop flight"
                     : connection.stops === 0
                       ? "Nonstop route"
-                      : "Potential connection — verify transfer"}
+                      : "Possible connecting flight — check the transfer"}
                 </p>
                 {schedules.status !== "fallback" &&
                   connection.segments.map((segment, index) => (
@@ -78,7 +78,7 @@ export function FlightSchedulesPanel({
                         : ""}
                       {segment.days?.length
                         ? ` · ${segment.days.join(", ")}`
-                        : " · operating days unknown"}
+                        : " · flight days unknown"}
                     </p>
                   ))}
               </li>

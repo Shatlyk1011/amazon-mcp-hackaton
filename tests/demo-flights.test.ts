@@ -14,7 +14,8 @@ describe("simulated flight examples", () => {
       const result = await searchFlightConnections(input);
       expect(result.status).toBe("fallback");
       expect(result.isDemoData).toBe(true);
-      expect(result.warning).toContain("fictional");
+      expect(result.warning).toContain("made up");
+      expect(result.warning).toContain("cannot be booked");
       expect(result.connections.map((connection) => connection.stops)).toEqual([
         0, 1,
       ]);

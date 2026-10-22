@@ -62,6 +62,13 @@ describe("shared UI and MCP move intake", () => {
     expect(modes).toContain("Drive");
     expect(modes).toContain("Fly");
   });
+  it("does not ask for a total budget and retains it when provided", () => {
+    const missing = beginIntake(without("budget"), {}, "", now);
+    expect(intakeView(missing).ready).toBe(true);
+    expect(completeIntake(missing).budget).toBeUndefined();
+    const explicit = beginIntake({ ...full, budget: 0 }, {}, "", now);
+    expect(completeIntake(explicit).budget).toBe(0);
+  });
   it("leaves missing essentials unknown and refuses premature generation", () => {
     const state = beginIntake(
       { origin: "New York, NY", destination: "Texas" },
@@ -190,7 +197,6 @@ describe("shared UI and MCP move intake", () => {
         { questionId: "movingDate", choice: "30" },
         { questionId: "housing", choice: "no" },
         { questionId: "belongings", choice: "luggage" },
-        { questionId: "budget", text: "4000" },
       ],
     );
     expect(view.ready).toBe(true);

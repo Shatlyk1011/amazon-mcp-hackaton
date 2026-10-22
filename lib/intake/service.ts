@@ -44,7 +44,7 @@ export async function getRentGuidance(
       ...base,
       status: "unavailable",
       explanation:
-        "Too few live listings to suggest a local rent range. Enter a rent ceiling or use optional income guidance.",
+        "There are too few current listings to suggest a local rent range. Enter a rent limit or use your income to help choose one.",
     };
   const percentile = (p: number) =>
     Math.round(rents[Math.floor((rents.length - 1) * p)] / 25) * 25;
@@ -55,7 +55,7 @@ export async function getRentGuidance(
     median: percentile(0.5),
     high: percentile(0.75),
     explanation:
-      "25th–75th percentile of matching live asking rents. A listing sample, not a citywide average or availability guarantee.",
+      "The middle half of asking rents in the matching current listings. This is not a citywide average or a guarantee that homes are available.",
   };
 }
 

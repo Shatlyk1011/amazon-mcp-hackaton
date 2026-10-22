@@ -126,6 +126,40 @@ async function resultFixture() {
 }
 
 describe("MoveFlow final result", () => {
+  it("builds and edits a plan without inventing an available budget", async () => {
+    const { budget: _budget, ...fields } = demoFamily;
+    void _budget;
+    const noBudget = {
+      ...beginIntake(fields),
+      expenseEstimates: testExpenseEstimates,
+    };
+    const result = await generatePlan(completeIntake(noBudget));
+    const plan = buildPlanPresentation(result, noBudget);
+    expect(plan.budget.budget).toBeNull();
+    expect(plan.budget.remaining).toBeNull();
+    expect(plan.briefing.summary).toContain(
+      "Add your budget to see how it compares",
+    );
+    expect(movePlanText(plan)).toContain("available budget not provided");
+    const app = appHarness();
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: { structuredContent: plan },
+    });
+    expect(app.root.text).toContain("Not provided");
+    expect(app.root.text).not.toContain("Budget gap");
+    expect(app.root.querySelector("#preference-budget")!.value).toBe("");
+    const submitting = app.root.querySelector("form")!.onsubmit!({
+      preventDefault() {},
+    });
+    const call = app.messages.find((m) => m.method === "tools/call")!;
+    expect(
+      (call.params.arguments as { changes: Record<string, unknown> }).changes,
+    ).not.toHaveProperty("budget");
+    app.send({ jsonrpc: "2.0", id: call.id, error: { message: "Done" } });
+    await submitting;
+  });
   it("shows saved homes separately with their actual city, unknown availability, and no live readiness credit", async () => {
     const { result } = await resultFixture();
     const plan = buildPlanPresentation(
@@ -165,7 +199,7 @@ describe("MoveFlow final result", () => {
     });
     expect(app.root.text).toContain("Saved rental examples · Houston, TX");
     expect(app.root.text).toContain(
-      "not live matches for " + plan.move.destination,
+      "not current matches for " + plan.move.destination,
     );
     expect(app.root.text).toContain("Live rental search is not configured.");
     expect(app.root.text).toContain("2026-10-15");
@@ -300,7 +334,7 @@ describe("MoveFlow final result", () => {
     expect(JSON.stringify(plan).length).toBeLessThan(16_000);
     expect(JSON.stringify(payload._meta)).toContain("points");
     expect(result.traces.length).toBeGreaterThan(0); // website shape is unchanged
-    expect(payload.content[0].text).toContain("Housing upfront");
+    expect(payload.content[0].text).toContain("Starting housing costs");
     expect(extractRelocationDetails).not.toHaveBeenCalled();
   });
   it("discloses unconfirmed preferences and excludes misleading fallback figures", async () => {
@@ -805,16 +839,19 @@ describe("shipped app bridge", () => {
     await Promise.resolve();
     expect(app.root.text).toContain("Homes to compare");
     expect(app.root.text).toContain("Moving budget");
+    expect(app.root.text).toContain("Estimated moving cost");
+    expect(app.root.text).toContain("Monthly rent limit");
+    expect(app.root.text).not.toContain("Monthly rent ceiling");
     expect(app.root.text).toContain("Budget overview");
     expect(app.root.text).toContain("Current budget");
-    expect(app.root.text).toContain("Required budget breakdown");
+    expect(app.root.text).toContain("Estimated cost breakdown");
     expect(app.root.text).toContain("First month of rent");
     expect(app.root.text).toContain("Travel and luggage");
     expect(app.root.text).not.toContain("Assumptions and unconfirmed details");
     expect(app.root.text).not.toContain("Your timeline");
     expect(app.root.text).toContain("Flight options");
     expect(app.root.text).toContain("DEMO 101");
-    expect(app.root.text).toContain("Sources and data status");
+    expect(app.root.text).toContain("Where this information comes from");
     expect(app.messages.map((m) => m.method)).not.toContain("ui/message");
     expect(app.messages.map((m) => m.method)).not.toContain(
       "ui/update-model-context",

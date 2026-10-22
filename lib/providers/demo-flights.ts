@@ -87,6 +87,7 @@ export async function searchFlightConnections(input: {
     status: "fallback",
     isDemoData: true,
     fetchedAt: new Date().toISOString(),
-    warning: "Demo schedules only; flights and availability are fictional.",
+    warning:
+      "These flight examples and times are made up. They cannot be booked.",
   };
 }

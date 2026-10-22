@@ -124,7 +124,7 @@ export function PlanWorkspace({
     <Card className="rounded-xl">
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle>Refine this plan</CardTitle>
+          <CardTitle>Change this plan</CardTitle>
           <Badge variant="secondary">Saved · Version {plan.version}</Badge>
         </div>
         <CardDescription>
@@ -320,13 +320,13 @@ export function PlanWorkspace({
         render={
           <Button size="lg" className="rounded-full px-5 shadow-lg">
             <Sparkles data-icon="inline-start" />
-            Refine this plan
+            Change this plan
           </Button>
         }
       />
       <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100%-2rem)] gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <DialogHeader className="border-b border-border px-6 py-5 pr-12">
-          <DialogTitle className="text-xl">Refine this plan</DialogTitle>
+          <DialogTitle className="text-xl">Change this plan</DialogTitle>
           <DialogDescription>
             Ask a question, make a change, or review your previous requests.
           </DialogDescription>
@@ -347,7 +347,9 @@ export function PlanWorkspace({
               <div className="flex flex-col gap-0.5">
                 <span className="text-muted-foreground">Budget</span>
                 <span className="font-medium">
-                  ${plan.input.budget.toLocaleString()}
+                  {plan.input.budget === undefined
+                    ? "Not provided"
+                    : `$${plan.input.budget.toLocaleString()}`}
                 </span>
               </div>
               <div className="flex flex-col gap-0.5">
@@ -375,7 +377,7 @@ export function PlanWorkspace({
           </AlertDescription>
         </Alert>
         <Button disabled={busy} onClick={() => void send("/retry", {})}>
-          {busy ? "Generating…" : "Generate plan results"}
+          {busy ? "Building…" : "Build your plan"}
         </Button>
         {controls}
         <Link href="/" className="underline">

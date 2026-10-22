@@ -158,11 +158,16 @@ export function buildInteractiveMaps(result: PlanResult) {
   const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
   if (!token || !token.startsWith("pk.")) return undefined;
   const route = result.route?.status === "live" ? routePoints(result) : [];
-  const homes = matchingHomes(result).slice(0, MAX_OPTIONS).flatMap((home, index) =>
-    Number.isFinite(home.lng) && Number.isFinite(home.lat) && Math.abs(home.lng) <= 180 && Math.abs(home.lat) <= 85
-      ? [{ index, coordinates: [home.lng, home.lat] }]
-      : [],
-  );
+  const homes = matchingHomes(result)
+    .slice(0, MAX_OPTIONS)
+    .flatMap((home, index) =>
+      Number.isFinite(home.lng) &&
+      Number.isFinite(home.lat) &&
+      Math.abs(home.lng) <= 180 &&
+      Math.abs(home.lat) <= 85
+        ? [{ index, coordinates: [home.lng, home.lat] }]
+        : [],
+    );
   return { token, route, homes };
 }
 
@@ -220,10 +225,10 @@ export function buildPlanPresentation(result: PlanResult, state: IntakeState) {
       : []),
     ...(input.needsHousing
       ? [
-          "Pet policies, move-in dates, fees, and availability must be confirmed with the listing provider. Links open address searches, not verified individual listing pages.",
+          "Check pet rules, move-in dates, fees, and availability with the listing provider. Links open address searches, not verified listings.",
         ]
       : []),
-    "Budget and strategy amounts are planning allowances, not provider quotes. No home, mover, or travel has been booked.",
+    "Cost estimates are for planning, not company quotes. No home, mover, or travel has been booked.",
   ];
   const readiness = assessMoveReadiness(snapshot);
   // Do not repeat the budget inside readiness.
@@ -293,7 +298,7 @@ export function buildPlanPresentation(result: PlanResult, state: IntakeState) {
       source: short(result.movingServicesSource),
       fetchedAt: result.movingServicesFetchedAt,
       warning: /development/i.test(result.movingServicesSource)
-        ? "Stored development examples are excluded from live provider results."
+        ? "Saved examples are not included in current results."
         : short(result.movingServicesWarning),
       totalOptions: movers.length,
       options: movers.slice(0, MAX_OPTIONS).map((mover) => ({
@@ -349,7 +354,7 @@ export function movePlanText(plan: MovePlanPresentation) {
             ? `Driving route: ${plan.route.distanceMiles} miles, about ${plan.route.durationHours} hours (${plan.route.source}).`
             : plan.route.warning,
         ]),
-    `Budget: ${dollars(plan.budget.recommended)} recommended allowance; ${dollars(plan.budget.budget)} available; ${plan.budget.remaining < 0 ? `${dollars(Math.abs(plan.budget.remaining))} gap` : `${dollars(plan.budget.remaining)} remaining`}. Housing upfront ${dollars(plan.budget.housingUpfront)}, travel ${dollars(plan.budget.transportation)}, moving ${dollars(plan.budget.moving)}, temporary accommodation ${dollars(plan.budget.temporaryAccommodation)}, other ${dollars(plan.budget.additional)}. Source: ${plan.budget.estimateSource === "model" ? "GPT planning estimates" : plan.budget.estimateSource === "user" ? "User-adjusted planning estimates" : "MoveFlow planning rules"}. Estimates, not quotes or verified market averages.`,
+    `Budget: ${dollars(plan.budget.recommended)} estimated moving cost; ${plan.budget.remaining === null ? "available budget not provided" : `${dollars(plan.budget.budget!)} available; ${plan.budget.remaining < 0 ? `${dollars(Math.abs(plan.budget.remaining))} gap` : `${dollars(plan.budget.remaining)} remaining`}`}. Starting housing costs ${dollars(plan.budget.housingUpfront)}, travel ${dollars(plan.budget.transportation)}, moving ${dollars(plan.budget.moving)}, temporary stay ${dollars(plan.budget.temporaryAccommodation)}, other ${dollars(plan.budget.additional)}. Source: ${plan.budget.estimateSource === "model" ? "AI cost estimates" : plan.budget.estimateSource === "user" ? "Your cost estimates" : "MoveFlow cost estimates"}. Estimates, not quotes or verified market averages.`,
     plan.move.needsHousing
       ? `Housing: ${plan.housing.totalMatches} live options within ${dollars(plan.move.maxRent)}/month and at least ${plan.move.minBedrooms} bedrooms. ${plan.housing.excludedCount} sample or out-of-criteria results excluded.`
       : "Housing is already arranged; rental search was not requested.",
@@ -357,12 +362,12 @@ export function movePlanText(plan: MovePlanPresentation) {
       .slice(0, 3)
       .map(
         (home) =>
-          `${home.title}: ${dollars(home.monthlyRent)}/month, ${home.bedrooms} bedrooms. ${home.sourceUrl ?? "Confirm with provider."}`,
+          `${home.title}: ${dollars(home.monthlyRent)}/month, ${home.bedrooms} bedrooms. ${home.sourceUrl ?? "Check with the listing provider."}`,
       ),
     `Housing source: ${plan.housing.source} (${plan.housing.status}), checked ${plan.housing.fetchedAt}. ${plan.housing.warning}`,
     ...(plan.housing.examples.total
       ? [
-          `Saved rental examples: ${plan.housing.examples.total} stored listings in ${plan.housing.examples.locations.join("; ") || "the saved dataset"}. These are not live matches for ${plan.move.destination}; current availability is unknown.`,
+          `Saved rental examples: ${plan.housing.examples.total} saved listings in ${plan.housing.examples.locations.join("; ") || "the saved data"}. These are not current matches for ${plan.move.destination}; we do not know if they are available.`,
         ]
       : []),
     `Moving services: ${plan.movers.totalOptions} live options. Source: ${plan.movers.source} (${plan.movers.status}). ${plan.movers.warning}`,
@@ -379,10 +384,10 @@ export function movePlanText(plan: MovePlanPresentation) {
           ),
         ]
       : []),
-    `Next action: ${plan.readiness.nextAction}`,
+    `Next step: ${plan.readiness.nextAction}`,
     ...plan.timeline.timeline.map((task) => `${task.dueDate}: ${task.title}`),
     ...plan.assumptions,
-    "Edit the expenses or move preferences in the app and select Update plan to refresh in place. This plan has not been saved to an account.",
+    "Change costs or move details in the app, then select Update plan. This plan has not been saved to an account.",
   ]
     .filter(Boolean)
     .join("\n");

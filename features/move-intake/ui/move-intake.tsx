@@ -49,8 +49,8 @@ const sourceLabels: Record<string, string> = {
   request: "Your request",
   saved_context: "Saved context",
   answer: "Your answer",
-  market: "Local rent sample",
-  income: "Income guidance",
+  market: "Local rental listings",
+  income: "Based on income",
 };
 
 export function MoveIntake({
@@ -259,7 +259,7 @@ export function MoveIntake({
                           />
                           {incomeMode ? (
                             <FieldDescription>
-                              We’ll suggest 30% as a starting rent ceiling. The
+                              We’ll suggest 30% as a starting rent limit. The
                               income amount itself is not saved.
                             </FieldDescription>
                           ) : null}

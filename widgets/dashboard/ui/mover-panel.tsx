@@ -29,8 +29,7 @@ export function MoverPanel({
         <div>
           <CardTitle>Moving services</CardTitle>
           <CardDescription>
-            Real companies from {source} · request a quote for route-specific
-            pricing
+            Companies from {source} · ask for a price for your move
           </CardDescription>
         </div>
         <Truck className="size-5 text-[#0070f3]" />
@@ -82,7 +81,7 @@ export function MoverPanel({
               ) : null}
               {item.distanceMiles !== undefined ? (
                 <div className="mt-3 text-xs text-muted-foreground">
-                  {item.distanceMiles} mi from origin
+                  {item.distanceMiles} miles from your starting city
                 </div>
               ) : null}
               <button

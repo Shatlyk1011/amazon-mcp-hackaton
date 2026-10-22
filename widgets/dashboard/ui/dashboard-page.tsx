@@ -143,7 +143,7 @@ export function DashboardPage({
             </Link>
             <div className="min-w-0">
               <div className="font-mono text-[11px] font-medium tracking-normal text-[#4d4d4d]">
-                MOVEFLOW · YOUR RELOCATION PLAN
+                MOVEFLOW · YOUR MOVING PLAN
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 text-base sm:text-lg font-semibold tracking-[-0.02em]">
                 {input.origin}{" "}
@@ -194,7 +194,7 @@ export function DashboardPage({
                     ` · ${input.pets} ${input.pets === 1 ? "pet" : "pets"}`}
                   {" · "}
                   {input.furniture ? "Furniture" : "Light luggage"}
-                  {" · Provider sources"}
+                  {" · Information sources"}
                 </p>
               </div>
               <Button
@@ -221,7 +221,13 @@ export function DashboardPage({
                   route ? `${route.distanceMiles} mi` : "—",
                   Route,
                 ],
-                ["Your budget", money(input.budget), CircleDollarSign],
+                [
+                  "Your budget",
+                  input.budget === undefined
+                    ? "Not provided"
+                    : money(input.budget),
+                  CircleDollarSign,
+                ],
                 [
                   "People moving",
                   `${input.adults + input.children} ${input.adults + input.children === 1 ? "person" : "people"}`,
@@ -305,7 +311,7 @@ export function DashboardPage({
             <div className="mt-10 flex flex-col gap-4">
               <div>
                 <h2 className="text-2xl font-semibold tracking-[-0.04em]">
-                  Strategy options
+                  Ways to move
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Three ways to get there, with the tradeoffs made clear.

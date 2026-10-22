@@ -25,10 +25,10 @@ export const planEditorRenderer = String.raw`
     const controls={}, expenses={}, sliders={};
     const money=value=>Number(value).toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
     const preview=element('div','','preview'),total=element('div','','estimate-total'),balance=element('p','','caption');
-    preview.append(element('div','Estimated upfront cash needed','eyebrow'),total,balance);form.append(preview);
-    const source=plan.budget.estimateSource==='model'?'GPT planning estimates':plan.budget.estimateSource==='user'?'Your applied estimates':'MoveFlow planning rules';
-    form.append(element('p',source+'. Editable estimates, not based on verified statistics or live quotes.','caption'));
-    const group=element('fieldset');group.append(element('legend','Adjust estimated expenses (USD)'));form.append(group);
+    preview.append(element('div','Estimated starting cost','eyebrow'),total,balance);form.append(preview);
+    const source=plan.budget.estimateSource==='model'?'AI cost estimates':plan.budget.estimateSource==='user'?'Your cost estimates':'MoveFlow cost estimates';
+    form.append(element('p',source+'. You can change these estimates. They are not based on verified statistics or current company quotes.','caption'));
+    const group=element('fieldset');group.append(element('legend','Change estimated costs (USD)'));form.append(group);
     const defaults={monthlyRent:plan.budget.monthlyRent,transportation:plan.budget.transportation,additional:plan.budget.additional+(plan.budget.housingFees??0)+(plan.budget.moving||0)+(plan.budget.temporaryAccommodation||0)};
     function expense(key,label,max){
       const wrap=element('div','','control'),heading=element('div','','control-heading'),title=element('label',label),input=element('input'),slider=element('input');
@@ -38,17 +38,17 @@ export const planEditorRenderer = String.raw`
       slider.oninput=()=>{input.value=slider.value;refresh();};
       heading.append(title,input);wrap.append(heading,slider);group.append(wrap);expenses[key]=input;sliders[key]=slider;
     }
-    expense('monthlyRent','Monthly rent assumption',6000);
+    expense('monthlyRent','Estimated monthly rent',6000);
     const depositLabel=element('label','','check'),deposit=element('input');deposit.type='checkbox';deposit.checked=plan.budget.includeSecurityDeposit??true;deposit.onchange=()=>refresh();depositLabel.append(deposit,element('span',"Include security deposit equal to one month's rent"));group.append(depositLabel);
     expense('transportation','Travel and luggage',4000);
-    expense('additional','Other costs and contingency (housing fees, moving services, temporary accommodation, supplies and contingency)',4000);
-    const details=element('details');details.append(element('summary','Edit move preferences'));form.append(details);
+    expense('additional','Other costs (housing fees, movers, a temporary stay, supplies, and extra costs)',4000);
+    const details=element('details');details.append(element('summary','Edit move details'));form.append(details);
     const preferences=element('fieldset');preferences.className='preferences';preferences.append(element('legend','Your move'));details.append(preferences);
     const fields=plan.state.fields;
     function preference(key,label,type,value,parent=preferences){
       const wrap=element('div','','control'),title=element('label',label),input=element(type==='textarea'?'textarea':'input');
       input.id='preference-'+key;title.htmlFor=input.id;
-      if(type!=='textarea'){input.type=type;input.className='entry';input.required=true;if(type==='number'){input.min=key==='adults'?'1':'0';input.max=['adults','children','pets','minBedrooms'].includes(key)?'20':key==='suitcases'?'1000':'1000000';input.step=['maxRent','budget'].includes(key)?'any':'1';}}
+      if(type!=='textarea'){input.type=type;input.className='entry';input.required=key!=='budget'||fields.budget!==undefined;if(type==='number'){input.min=key==='adults'?'1':'0';input.max=['adults','children','pets','minBedrooms'].includes(key)?'20':key==='suitcases'?'1000':'1000000';input.step=['maxRent','budget'].includes(key)?'any':'1';}}
       if(type==='textarea')input.maxLength=1500;
       input.value=String(value??'');input.oninput=()=>refresh();input.onchange=()=>refresh();wrap.append(title,input);parent.append(wrap);controls[key]=input;
     }
@@ -70,18 +70,18 @@ export const planEditorRenderer = String.raw`
     const householdCounts=element('div','','household-counts');householdCounts.hidden=householdValue!=='family';household.group.append(householdCounts);
     preference('adults','Adults','number',plan.move.adults,householdCounts);
     preference('children','Children','number',plan.move.children,householdCounts);
-    controls.furniture=radioPreference('furniture','What are you bringing?',String(plan.move.furniture),[['false','Suitcases and moving boxes'],['true','Furniture and household belongings']]).control;
+    controls.furniture=radioPreference('furniture','What are you bringing?',String(plan.move.furniture),[['false','Suitcases and moving boxes'],['true','Furniture and other belongings']]).control;
     controls.needsHousing=radioPreference('needsHousing','Housing',String(plan.move.needsHousing),[['true','Find a rental'],['false','Already arranged']]).control;
-    preference('maxRent','Maximum monthly rent (USD)','number',plan.move.maxRent);
-    controls.transport=radioPreference('transport','Preferred travel mode',plan.move.transport,[['fly','Flight'],['drive','Drive'],['compare','Compare driving and flying']]).control;
+    preference('maxRent','Monthly rent limit (USD)','number',plan.move.maxRent);
+    controls.transport=radioPreference('transport','How you want to travel',plan.move.transport,[['fly','Flight'],['drive','Drive'],['compare','Compare driving and flying']]).control;
     preference('movingDate','Move date','date',plan.move.movingDate);
-    preference('budget','Total available budget (USD)','number',plan.budget.budget);
+    preference('budget','Total available budget (USD, optional)','number',plan.budget.budget);
     const extraDetails=element('details');extraDetails.append(element('summary','More move details'));preferences.append(extraDetails);
     const extraPreferences=element('fieldset','','extra-preferences');extraPreferences.append(element('legend','Packing and housing details'));extraDetails.append(extraPreferences);
     preference('pets','Pets','number',plan.move.pets,extraPreferences);
     preference('suitcases','Suitcases / boxes','number',fields.suitcases??2*(plan.move.adults+plan.move.children),extraPreferences);
     preference('minBedrooms','Minimum bedrooms','number',plan.move.minBedrooms,extraPreferences);
-    preference('otherNeeds','Additional preferences','textarea',fields.otherNeeds);
+    preference('otherNeeds','Other needs','textarea',fields.otherNeeds);
     const actions=element('div','','actions'),apply=element('button','Update plan','apply'),reset=element('button','Reset edits','reset');apply.type='submit';reset.type='button';actions.append(apply,reset);form.append(actions);
     const status=element('p','','status');status.setAttribute('role','status');form.append(status);
     function number(input){return Number(input.value)||0;}
@@ -90,24 +90,24 @@ export const planEditorRenderer = String.raw`
       expenses.monthlyRent.disabled=!housing;sliders.monthlyRent.disabled=!housing;deposit.disabled=!housing;
       const rent=housing?number(expenses.monthlyRent):0;
       const value=rent*(deposit.checked?2:1)+number(expenses.transportation)+number(expenses.additional);
-      total.textContent=money(value);const remaining=(controls.budget?number(controls.budget):plan.budget.budget)-value;
-      balance.textContent=(remaining<0?'Budget gap: ':'Budget remaining: ')+money(Math.abs(remaining))+' · Preview; apply to refresh the full plan.';
+      total.textContent=money(value);const available=controls.budget.value.trim()===''?null:number(controls.budget);
+      balance.textContent=available===null?'Add a budget to compare · Preview; select Update plan to apply these changes.':((available-value)<0?'Over budget: ':'Money left: ')+money(Math.abs(available-value))+' · Preview; select Update plan to apply these changes.';
     }
     reset.onclick=()=>{if(busy)return;renderPlan(plan,currentPlanMeta);};
     form.onsubmit=async event=>{
       event.preventDefault();if(busy)return;
       if(typeof form.reportValidity==='function'&&!form.reportValidity())return;
       const changes={};
-      Object.entries(controls).forEach(([key,input])=>{const value=['furniture','needsHousing'].includes(key)?input.value==='true':['transport','movingDate','otherNeeds'].includes(key)?input.value:number(input);const previous=fields[key]??(key==='transport'?plan.move.transport:key==='suitcases'?2*(plan.move.adults+plan.move.children):'');if(value!==previous)changes[key]=value;});
+      Object.entries(controls).forEach(([key,input])=>{if(key==='budget'&&input.value.trim()==='')return;const value=['furniture','needsHousing'].includes(key)?input.value==='true':['transport','movingDate','otherNeeds'].includes(key)?input.value:number(input);const previous=fields[key]??(key==='transport'?plan.move.transport:key==='suitcases'?2*(plan.move.adults+plan.move.children):'');if(value!==previous)changes[key]=value;});
       const estimates={source:'user',includeSecurityDeposit:deposit.checked,housingFees:0,moving:0,temporaryAccommodation:0};Object.entries(expenses).forEach(([key,input])=>{estimates[key]=number(input);});
-      busy=true;apply.disabled=true;reset.disabled=true;group.disabled=true;preferences.disabled=true;apply.textContent='Updating…';status.textContent='Refreshing housing, expenses and your timeline…';root.querySelector('.error')?.remove();
+      busy=true;apply.disabled=true;reset.disabled=true;group.disabled=true;preferences.disabled=true;apply.textContent='Updating…';status.textContent='Updating homes, costs, and your moving schedule…';root.querySelector('.error')?.remove();
       try{
         const reply=await request('tools/call',{name:'update_move_plan',arguments:{state:plan.state,changes,estimates}});
         update(reply);
         if(reply.structuredContent?.status==='ready'){
           const latest=reply.structuredContent;
           const latestStatus=root.querySelector('.status');
-          if(latestStatus)latestStatus.textContent='Plan updated · '+money(latest.budget.recommended)+' total · '+(latest.budget.remaining<0?money(Math.abs(latest.budget.remaining))+' over budget':money(latest.budget.remaining)+' remaining');
+          if(latestStatus)latestStatus.textContent='Plan updated · '+money(latest.budget.recommended)+' total · '+(latest.budget.remaining===null?'budget not provided':latest.budget.remaining<0?money(Math.abs(latest.budget.remaining))+' over budget':money(latest.budget.remaining)+' remaining');
           // Keep future conversation context current without creating a chat turn.
           request('ui/update-model-context',{content:[{type:'text',text:JSON.stringify({move:latest.move,budget:latest.budget,nextAction:latest.readiness.nextAction})}]}).catch(()=>{});
         }

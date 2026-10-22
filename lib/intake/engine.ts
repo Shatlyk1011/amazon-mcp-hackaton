@@ -131,7 +131,7 @@ export function pendingQuestions(state: IntakeState): IntakeQuestion[] {
       id: "household",
       title: "Who is making this move?",
       description:
-        "We use household size for travel, home size, and moving costs. For a custom answer, enter adults and children, e.g. 2 adults, 3 children.",
+        "We use the number of people to estimate travel, housing, and moving costs. For another group size, enter the number of adults and children.",
       placeholder: "2 adults, 3 children",
       options: [
         { id: "solo", label: "Just me", values: { adults: 1, children: 0 } },
@@ -167,7 +167,7 @@ export function pendingQuestions(state: IntakeState): IntakeQuestion[] {
   if (f.needsHousing === undefined)
     questions.push({
       id: "housing",
-      title: "Will you need a home at the destination?",
+      title: "Will you need a home in your new city?",
       description:
         "We can search rentals or plan around a home you already have.",
       placeholder: "Yes, search rentals / No, I have a home",
@@ -184,8 +184,7 @@ export function pendingQuestions(state: IntakeState): IntakeQuestion[] {
     questions.push({
       id: "belongings",
       title: "What are you taking with you?",
-      description:
-        "This determines whether to include movers and packing costs.",
+      description: "This helps us estimate moving and packing costs.",
       placeholder: "Furniture and boxes / Luggage only",
       options: [
         { id: "luggage", label: "Luggage only", values: { furniture: false } },
@@ -210,43 +209,32 @@ export function pendingQuestions(state: IntakeState): IntakeQuestion[] {
       id: "rent",
       title: "What monthly rent feels comfortable?",
       description: live
-        ? `${g.destination}: sampled ${g.bedrooms}-bedroom asking rents range from ${money(g.low!)} to ${money(g.high!)}; median ${money(g.median!)} (${g.sampleSize} listings, ${g.source}). This is a listing sample, not a citywide average.`
-        : "Enter a monthly rent limit, or use 30% of monthly take-home income as a starting point. Income is optional. Local price guidance is currently unavailable.",
+        ? `${g.destination}: in ${g.sampleSize} listings, the middle half of asking rents for ${g.bedrooms}-bedroom homes ranged from ${money(g.low!)} to ${money(g.high!)}. The middle price was ${money(g.median!)} (${g.source}). This is not a citywide average.`
+        : "Enter a monthly rent limit, or use 30% of monthly take-home income as a starting point. Local rent information is not available right now.",
       placeholder: "Monthly rent limit in USD",
       inputType: "number",
       options: live
         ? [
             {
               id: "market-low",
-              label: `${money(g.low!)} · lower sample`,
+              label: `${money(g.low!)} · lower end`,
               values: { maxRent: g.low },
               source: "market",
             },
             {
               id: "market-mid",
-              label: `${money(g.median!)} · median sample`,
+              label: `${money(g.median!)} · middle`,
               values: { maxRent: g.median },
               source: "market",
             },
             {
               id: "market-high",
-              label: `${money(g.high!)} · higher sample`,
+              label: `${money(g.high!)} · higher end`,
               values: { maxRent: g.high },
               source: "market",
             },
           ]
         : [],
-    });
-  }
-  if (f.budget === undefined) {
-    questions.push({
-      id: "budget",
-      title: "What is your total moving budget?",
-      description:
-        "Enter the total amount you have available for the move, separate from your monthly rent limit.",
-      placeholder: "Total move budget in USD",
-      inputType: "number",
-      options: [],
     });
   }
   return questions;
@@ -256,16 +244,16 @@ export function intakeView(raw: IntakeState): IntakeView {
   const state = intakeStateSchema.parse(raw);
   const questions = pendingQuestions(state);
   const assumptions = [
-    "Cost estimates are planning estimates, not travel or mover quotes.",
+    "Estimated costs are for planning. They are not travel or moving company quotes.",
     ...(state.fields.pets === undefined
       ? ["No pets are included unless you add them to your move details."]
       : []),
     ...(state.fields.suitcases === undefined
-      ? ["Packing allowance uses two suitcases per traveler unless specified."]
+      ? ["We estimate two suitcases per person unless you tell us otherwise."]
       : []),
     ...(state.sources.maxRent === "income"
       ? [
-          "Rent ceiling uses 30% of monthly take-home income as a user-selected starting point.",
+          "Your rent limit starts at 30% of your monthly take-home pay, as you chose.",
         ]
       : []),
   ];
