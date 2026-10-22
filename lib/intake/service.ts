@@ -1,4 +1,13 @@
 import "server-only";
+import OpenAI from "openai";
+import { z } from "zod";
+import { zodTextFormat } from "openai/helpers/zod";
+import {
+  states,
+  stateOnly,
+  resolveState,
+  statesFromMovePrompt,
+} from "./cities";
 import { searchHousing } from "@/lib/providers/rentcast";
 import { extractRelocationDetails } from "@/lib/plans/prompt";
 import { PlanError } from "@/lib/plans/errors";
@@ -15,6 +24,53 @@ import {
   type IntakeState,
   type RentGuidance,
 } from "./schema";
+
+// Suggestions are optional: a provider failure must never block manual entry.
+export async function getCitySuggestions(
+  stateName?: string,
+): Promise<string[]> {
+  if (!process.env.OPENAI_API_KEY) return [];
+  const state = stateOnly(stateName);
+  if (stateName && !state) return [];
+  try {
+    const response = await new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      maxRetries: 0,
+      timeout: 10000,
+    }).responses.parse({
+      model: process.env.OPENAI_MODEL || "gpt-5-mini",
+      store: false,
+      instructions:
+        "Suggest three distinct, well-known US cities for a moving questionnaire. Return city and two-letter state abbreviation, e.g. Austin, TX. If a state is specified, all cities must be in that state. Do not select a city for the user.",
+      input: state
+        ? `State: ${state.name} (${state.abbreviation})`
+        : "No state is known; suggest cities from different states.",
+      text: {
+        format: zodTextFormat(
+          z.object({ cities: z.array(z.string()).max(3) }),
+          "city_suggestions",
+        ),
+      },
+    });
+    const candidates = response.output_parsed?.cities ?? [];
+    const valid = new Map<string, string>();
+    for (const item of state ? [state] : states) {
+      for (const city of item.cities) {
+        const label = `${city.name}, ${item.abbreviation}`;
+        valid.set(label.toLowerCase(), label);
+      }
+    }
+    return [
+      ...new Set(
+        candidates
+          .map((city) => valid.get(city.trim().toLowerCase()))
+          .filter((city): city is string => Boolean(city)),
+      ),
+    ].slice(0, 3);
+  } catch {
+    return [];
+  }
+}
 
 export async function getRentGuidance(
   destination: string,
@@ -60,7 +116,31 @@ export async function getRentGuidance(
 }
 
 export async function enrichIntake(state: IntakeState) {
-  const view = intakeView(state);
+  let view = intakeView(state);
+  const missingCities = view.questions.filter(
+    (q) =>
+      (q.id === "origin" || q.id === "destination") &&
+      state.citySuggestions?.[q.id] === undefined,
+  );
+  if (missingCities.length) {
+    const suggestions = await Promise.all(
+      missingCities.map((q) =>
+        getCitySuggestions(
+          stateOnly(state.fields[q.id as "origin" | "destination"])?.name,
+        ),
+      ),
+    );
+    state = {
+      ...state,
+      citySuggestions: {
+        ...state.citySuggestions,
+        ...Object.fromEntries(
+          missingCities.map((q, index) => [q.id, suggestions[index]]),
+        ),
+      },
+    };
+    view = intakeView(state);
+  }
   if (view.nextQuestion?.id !== "rent") return view;
   const bedrooms = state.fields.minBedrooms ?? state.fields.bedrooms ?? 1;
   const previous = state.rentGuidance;
@@ -91,10 +171,16 @@ export async function prepareIntake(
       extractionFailed = true;
     }
   }
+  // Recover unambiguous state-only routes when extraction omitted them, and
+  // normalize simple misspellings without replacing an extracted city.
+  const promptStates = statesFromMovePrompt(prompt);
+  const request = { ...promptStates, ...extracted, ...known };
+  for (const field of ["origin", "destination"] as const) {
+    const normalized = resolveState(request[field]);
+    if (normalized) request[field] = normalized.name;
+  }
   // A new, explicit request wins over saved context, including typed structured values.
-  const view = await enrichIntake(
-    beginIntake({ ...extracted, ...known }, context, prompt),
-  );
+  const view = await enrichIntake(beginIntake(request, context, prompt));
   return extractionFailed
     ? {
         ...view,
