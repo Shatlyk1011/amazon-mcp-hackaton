@@ -5,6 +5,7 @@ import {
   type RelocationInput,
 } from "@/lib/relocation";
 import { searchHousing } from "@/lib/providers/rentcast";
+import { searchFlightConnections } from "@/lib/providers/demo-flights";
 import { searchMovingServices } from "@/lib/providers/tomtom-search";
 import { withMovingEstimates } from "@/lib/intake/estimate-expenses";
 
@@ -27,6 +28,7 @@ export async function generatePlan(
     estimatedInput,
     route,
     housingResult,
+    flightSchedules,
     movingServicesResult,
   ] = await Promise.all([
     withMovingEstimates(input),
@@ -46,6 +48,14 @@ export async function generatePlan(
           warning:
             "Housing is already arranged; rental search was not requested.",
           browseUrl: "https://www.zillow.com/",
+        }),
+    input.transport === "drive"
+      ? Promise.resolve(null)
+      : searchFlightConnections({
+          origin: input.origin,
+          destination: input.destination,
+          departureDate: input.movingDate,
+          maxStops: 1,
         }),
     moversPromise,
   ]);
@@ -84,6 +94,18 @@ export async function generatePlan(
       source: movingServicesResult.source,
       dataStatus: movingServicesResult.status,
     },
+    ...(flightSchedules
+      ? [
+          {
+            tool: "suggest_flight_connections",
+            status: "completed",
+            duration: Date.now() - start,
+            output: flightSchedules,
+            source: flightSchedules.source,
+            dataStatus: flightSchedules.status,
+          },
+        ]
+      : []),
     {
       tool: "calculate_budget",
       status: "completed",
@@ -96,6 +118,7 @@ export async function generatePlan(
     route,
     housing,
     movers,
+    flightSchedules,
     recommendations: recommendations(input),
     budget: calculateBudget(input, selectedHousing),
     housingSource: housingResult.source,
