@@ -27,12 +27,15 @@ export function MoverPanel({
     <Card className="rounded-xl bg-white shadow-[0_1px_1px_rgba(0,0,0,0.04)] ring-[#ebebeb]">
       <CardHeader className="flex-row items-start justify-between">
         <div>
-          <CardTitle>Moving services</CardTitle>
+          <CardTitle>
+            <Truck />
+            Moving services
+          </CardTitle>
           <CardDescription>
             Companies from {source} · ask for a price for your move
           </CardDescription>
         </div>
-        <Truck className="size-5 text-[#0070f3]" />
+
       </CardHeader>
       <CardContent>
         {warning ? (
