@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import { Home, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -20,14 +20,17 @@ export function HousingMap({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
+  const selectListing = useEffectEvent((id: string) => onSelect(id));
   const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+  // Saving a selection can replace the listings array with equivalent data.
+  const listingsKey = JSON.stringify(listings);
   const mappableListings = useMemo(
     () =>
-      listings.filter(
+      (JSON.parse(listingsKey) as Housing[]).filter(
         (listing) =>
           Number.isFinite(listing.lat) && Number.isFinite(listing.lng),
       ),
-    [listings],
+    [listingsKey],
   );
 
   useEffect(() => {
@@ -111,7 +114,7 @@ export function HousingMap({
             };
             const showPopup = () => {
               cancelClose();
-              onSelect(listing.id);
+              selectListing(listing.id);
               popup.setLngLat([listing.lng, listing.lat]).addTo(map);
               if (!popupElement) {
                 popupElement = popup.getElement() ?? null;
@@ -148,9 +151,7 @@ export function HousingMap({
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [mappableListings, onSelect, token]);
-
-  console.log('listings', listings)
+  }, [mappableListings, token]);
 
   return (
     <Card className="gap-0 overflow-hidden rounded-xl bg-card py-0 ring-[#ebebeb]">
