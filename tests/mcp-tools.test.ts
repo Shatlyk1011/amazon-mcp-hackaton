@@ -63,6 +63,10 @@ describe("relocation tool discovery metadata", () => {
       expect(intake?.description).toContain("moving from Boston to Austin");
       expect(intake?.description).toContain("simple trip or flight search");
       expect(intake?.description).toContain("never invent");
+      expect(intake?.description).toContain(
+        "earlier conversation, user profile, or memory",
+      );
+      expect(intake?.description).toContain("set includeContext to true");
     } finally {
       await client.close();
     }
@@ -177,6 +181,64 @@ const standaloneCalls: {
 ];
 
 describe("public MCP standalone contracts", () => {
+  it("uses supplied user context, gives current facts precedence, and carries it into plan generation", async () => {
+    const client = await connectPublic();
+    try {
+      const {
+        adults: _adults,
+        children: _children,
+        pets: _pets,
+        ...move
+      } = demoFamily;
+      void _adults;
+      void _children;
+      void _pets;
+      const prepared = await client.callTool({
+        name: "prepare_move_intake",
+        arguments: {
+          known: {
+            ...move,
+            adults: 3,
+            otherNeeds: "No additional requirements",
+          },
+          savedContext: { adults: 2, children: 2, pets: 1 },
+          includeContext: true,
+        },
+      });
+      const view = prepared.structuredContent as {
+        ready: boolean;
+        questions: { id: string }[];
+        state: {
+          fields: Record<string, unknown>;
+          sources: Record<string, string>;
+        };
+      };
+      expect(view.state.fields).toMatchObject({
+        adults: 3,
+        children: 2,
+        pets: 1,
+      });
+      expect(view.state.sources).toMatchObject({
+        adults: "request",
+        children: "saved_context",
+        pets: "saved_context",
+      });
+      expect(view.questions.map((question) => question.id)).not.toContain(
+        "household",
+      );
+      expect(view.ready).toBe(true);
+      const generated = await client.callTool({
+        name: "generate_move_plan",
+        arguments: { state: view.state },
+      });
+      expect(generated.structuredContent).toMatchObject({
+        status: "ready",
+        state: { fields: { adults: 3, children: 2, pets: 1 } },
+      });
+    } finally {
+      await client.close();
+    }
+  });
   it("asks the user to enter unspecified locations without suggesting a default route", async () => {
     const client = await connectPublic();
     try {

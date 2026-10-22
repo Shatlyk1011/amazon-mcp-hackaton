@@ -34,8 +34,7 @@ APP_URL=http://localhost:3000
 - `TOMTOM_API_KEY`: [TomTom developer key](https://developer.tomtom.com/) with Search API enabled, used for moving services and destination essentials.
 - `APP_URL`: canonical app origin used by the server-side MCP client; match the local development port or deployed HTTPS origin.
 
-
-For deployment, set `APP_URL` to the exact HTTPS application origin. The server-side MCP client uses this configured origin, never a model-provided URL or untrusted Host header. It must be reachable by the application's server. 
+For deployment, set `APP_URL` to the exact HTTPS application origin. The server-side MCP client uses this configured origin, never a model-provided URL or untrusted Host header. It must be reachable by the application's server.
 
 ## MCP tools and response contract
 
@@ -45,6 +44,8 @@ For deployment, set `APP_URL` to the exact HTTPS application origin. The server-
 - `generate_move_plan`: check completeness and return `needs_input` or a plan. Supply estimates or configure OpenAI to generate rough allowances.
 - `update_move_plan`: apply preferences and expense edits to caller-owned state and regenerate the plan. User-supplied estimates persist in that state.
 - Other tools provide route, housing, mover and budget calculations, comparisons, readiness, timeline, destination essentials, and briefings. `draft_relocation_plan` and `preview_relocation_selection` are non-persistent. Use `tools/list` for the full schemas.
+
+MCP hosts can pass relevant facts the user previously shared (for example, adult, child and pet counts) as `savedContext` with `includeContext: true` when calling `prepare_move_intake`. Put facts from the current request in `known`; they take precedence. The intake tracks the source of each fact, asks for missing details, and carries the resulting state into plan generation. The public server cannot access a host's conversation, memory or browser profile on its own: the host must select and send applicable facts, and host behavior may vary.
 
 `prepare_move_intake` advertises `ui://moveflow/quiz-v4.html`; `generate_move_plan` advertises `ui://moveflow/plan-v3.html`. The quiz calls the intake and plan tools directly. The plan widget calls `update_move_plan` and synchronizes context when supported.
 
