@@ -17,7 +17,17 @@ export async function getPlan(id: string, owner: string): Promise<SavedPlan> {
     [id, owner],
   );
   if (!rows[0]) throw new PlanError("Plan not found.", 404);
-  return rows[0] as SavedPlan;
+  const plan = rows[0] as SavedPlan;
+  if (!plan.result) return plan;
+  // Older saved plans may contain fictional flight schedules and traces.
+  const result = { ...plan.result } as PlanResult & {
+    flightSchedules?: unknown;
+  };
+  delete result.flightSchedules;
+  result.traces = result.traces.filter(
+    (trace) => trace.tool !== "suggest_flight_connections",
+  );
+  return { ...plan, result };
 }
 
 export async function createPlan(
@@ -107,7 +117,12 @@ export async function listRequests(
   const rows =
     await database()`SELECT id, message, reply, status, tools, created_at AS "createdAt"
     FROM (SELECT * FROM relocation_requests WHERE plan_id = ${id} ORDER BY created_at DESC LIMIT 30) recent ORDER BY created_at`;
-  return rows as PlanRequest[];
+  return (rows as PlanRequest[]).map((request) => ({
+    ...request,
+    tools: request.tools.filter(
+      (tool) => tool.tool !== "suggest_flight_connections",
+    ),
+  }));
 }
 
 export async function startRequest(

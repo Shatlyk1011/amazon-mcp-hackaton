@@ -19,7 +19,6 @@ import {
   readinessSnapshotSchema,
 } from "@/lib/relocation-insights";
 import { searchHousing } from "@/lib/providers/rentcast";
-import { searchFlightConnections } from "@/lib/providers/demo-flights";
 import {
   essentialCategorySchema,
   searchDestinationEssentials,
@@ -81,30 +80,6 @@ const publicMcpHandler = createMcpHandler((server) => {
     async (input) => ({
       content: [
         { type: "text", text: JSON.stringify(await calculateRoute(input)) },
-      ],
-    }),
-  );
-  server.registerTool(
-    "suggest_flight_connections",
-    {
-      description:
-        "Return fictional direct and one-stop flight examples for demonstration only. These are not real airlines, flights, routes, schedules, fares, or booking availability; never present them as actual travel options.",
-      inputSchema: z
-        .object({
-          origin: usCitySchema,
-          destination: usCitySchema,
-          departureDate: z.iso.date(),
-          maxStops: z.union([z.literal(0), z.literal(1)]).default(1),
-        })
-        .strict(),
-      annotations: providerAnnotations,
-    },
-    async (input) => ({
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(await searchFlightConnections(input)),
-        },
       ],
     }),
   );

@@ -56,6 +56,9 @@ describe("relocation tool discovery metadata", () => {
     const client = await connectPublic();
     try {
       const { tools } = await client.listTools();
+      expect(tools.map((tool) => tool.name)).not.toContain(
+        "suggest_flight_connections",
+      );
       const intake = tools.find((tool) => tool.name === "prepare_move_intake");
       expect(intake?.description).toContain("moving from Boston to Austin");
       expect(intake?.description).toContain("simple trip or flight search");
@@ -100,14 +103,6 @@ const standaloneCalls: {
     arguments: {
       origin: demoFamily.origin,
       destination: demoFamily.destination,
-    },
-  },
-  {
-    name: "suggest_flight_connections",
-    arguments: {
-      origin: demoFamily.origin,
-      destination: demoFamily.destination,
-      departureDate: demoFamily.movingDate,
     },
   },
   {

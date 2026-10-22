@@ -7,9 +7,6 @@ vi.mock("@/lib/providers/tomtom-search", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/providers/tomtom-search")>()),
   searchMovingServices: vi.fn(),
 }));
-vi.mock("@/lib/providers/demo-flights", () => ({
-  searchFlightConnections: vi.fn(),
-}));
 vi.mock("@/lib/plans/prompt", () => ({ extractRelocationDetails: vi.fn() }));
 const parseEstimates = vi.hoisted(() => vi.fn());
 vi.mock("openai", () => ({
@@ -25,7 +22,6 @@ import { POST } from "@/app/api/mcp/route";
 import { calculateMapboxRoute } from "@/lib/providers/mapbox";
 import { searchHousing } from "@/lib/providers/rentcast";
 import { searchMovingServices } from "@/lib/providers/tomtom-search";
-import { searchFlightConnections } from "@/lib/providers/demo-flights";
 import { extractRelocationDetails } from "@/lib/plans/prompt";
 import { testExpenseEstimates } from "./fixtures/estimates";
 import { generatePlan } from "@/lib/plans/generate";
@@ -109,29 +105,6 @@ beforeEach(() => {
     status: "live",
     source: "TomTom",
     fetchedAt,
-  });
-  vi.mocked(searchFlightConnections).mockResolvedValue({
-    origin: demoFamily.origin,
-    destination: demoFamily.destination,
-    departureDate: demoFamily.movingDate,
-    status: "fallback",
-    source: "Simulated flight examples",
-    fetchedAt,
-    isDemoData: true,
-    connections: [
-      {
-        id: "demo",
-        stops: 0,
-        segments: [
-          {
-            flightNumber: "DEMO 101",
-            airline: "Fiction",
-            originAirport: "BOS",
-            destinationAirport: "JFK",
-          },
-        ],
-      },
-    ],
   });
 });
 afterEach(() => {
@@ -317,11 +290,8 @@ describe("MoveFlow final result", () => {
     expect(plan.housing.options.map((h) => h.id)).toEqual(["match"]);
     expect(plan.housing.excludedCount).toBe(3);
     expect(plan.movers.options[0].sourceUrl).toBeUndefined();
-    expect(plan.flights?.isDemoData).toBe(true);
-    expect(plan.flights?.connections[0].segments[0].flightNumber).toBe(
-      "DEMO 101",
-    );
-    expect(payload.content[0].text).toContain("fictional demo schedules");
+    expect(plan).not.toHaveProperty("flights");
+    expect(payload.content[0].text).not.toContain("Flight examples");
     expect(JSON.stringify(plan)).not.toContain("geometry");
     expect(JSON.stringify(plan)).not.toContain("traces");
     expect(JSON.stringify(plan).length).toBeLessThan(16_000);
@@ -369,22 +339,13 @@ describe("MoveFlow final result", () => {
     expect(plan.movers.options).toEqual([]);
     expect(plan.movers.status).toBe("unavailable");
   });
-  it("omits flights when only driving was requested", async () => {
-    const { result } = await resultFixture();
-    const plan = buildPlanPresentation(
-      { ...result, flightSchedules: null },
-      state,
-    );
-    expect(plan.flights).toBeNull();
-    expect(movePlanText(plan)).not.toContain("Flight examples");
-  });
-  it("shows flight examples without a driving warning for an airplane-only move", async () => {
+  it("omits flight examples and driving warnings for an airplane-only move", async () => {
     const { result } = await resultFixture();
     const plan = buildPlanPresentation(
       { ...result, input: { ...result.input, transport: "fly" }, route: null },
       state,
     );
-    expect(movePlanText(plan)).toContain("DEMO 101");
+    expect(movePlanText(plan)).not.toContain("DEMO 101");
     expect(movePlanText(plan)).not.toContain(
       "Live driving directions are unavailable",
     );
@@ -394,7 +355,7 @@ describe("MoveFlow final result", () => {
       method: "ui/notifications/tool-result",
       params: { structuredContent: plan },
     });
-    expect(app.root.text).toContain("DEMO 101");
+    expect(app.root.text).not.toContain("DEMO 101");
     expect(app.root.text).not.toContain(
       "Live driving directions are unavailable",
     );
@@ -782,6 +743,46 @@ describe("shipped app bridge", () => {
         .map((m) => m.params.height),
     ).toEqual([602, 603, 902, 402]);
   });
+  it("starts building as soon as the final quiz answer is accepted", async () => {
+    const app = appHarness();
+    const ready = intakeView(state);
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: {
+        structuredContent: {
+          ...ready,
+          ready: false,
+          nextQuestion: {
+            id: "other",
+            title: "Anything else?",
+            description: "",
+            options: [],
+            inputType: "text",
+          },
+        },
+      },
+    });
+    app.root.querySelector("#answer")!.value = "No";
+    const submitting = app.root.querySelector("form")!.onsubmit!({
+      preventDefault() {},
+    });
+    const answer = app.messages.find((m) => m.method === "tools/call")!;
+    expect(answer.params.name).toBe("answer_move_intake");
+    app.send({
+      jsonrpc: "2.0",
+      id: answer.id,
+      result: { structuredContent: ready },
+    });
+    await submitting;
+    const calls = app.messages.filter((m) => m.method === "tools/call");
+    expect(calls.map((m) => m.params.name)).toEqual([
+      "answer_move_intake",
+      "generate_move_plan",
+    ]);
+    expect(calls[1].params.arguments).toEqual({ state });
+    expect(app.root.querySelector("button")).toBeNull();
+  });
   it("builds in the widget and renders the same result as direct tool calls", async () => {
     const { payload } = await resultFixture();
     const app = appHarness();
@@ -790,20 +791,20 @@ describe("shipped app bridge", () => {
       method: "ui/notifications/tool-result",
       params: { structuredContent: intakeView(state) },
     });
-    const building = app.root.querySelector("button")!.onclick!();
+    expect(app.root.text).toContain("Building your moving plan");
+    expect(app.root.querySelector("button")).toBeNull();
     const request = app.messages.find((m) => m.method === "tools/call")!;
     expect(request.params).toMatchObject({
       name: "generate_move_plan",
       arguments: { state },
     });
     app.send({ jsonrpc: "2.0", id: request.id, result: payload });
-    await building;
+    await Promise.resolve();
     expect(app.root.text).toContain("Homes to compare");
     expect(app.root.text).toContain("Moving budget");
     expect(app.root.text).not.toContain("Your timeline");
-    expect(app.root.text).toContain("Flight options");
-    expect(app.root.text).toContain("DEMO 101");
-    expect(app.root.text).toContain("Demo data");
+    expect(app.root.text).not.toContain("Flight options");
+    expect(app.root.text).not.toContain("DEMO 101");
     expect(app.root.text).toContain("Sources and data status");
     expect(app.messages.map((m) => m.method)).not.toContain("ui/message");
     expect(app.messages.map((m) => m.method)).not.toContain(
@@ -824,26 +825,24 @@ describe("shipped app bridge", () => {
       method: "ui/notifications/tool-result",
       params: { structuredContent: intakeView(state) },
     });
-    const button = app.root.querySelector("button")!;
-    const building = button.onclick!();
     const request = app.messages.find((m) => m.method === "tools/call")!;
     app.send({
       jsonrpc: "2.0",
       id: request.id,
       result: { isError: true, content: [{ text: "Provider unavailable" }] },
     });
-    await building;
-    expect(button.disabled).toBe(false);
+    await Promise.resolve();
+    const button = app.root.querySelector("button")!;
     expect(button.textContent).toContain("Retry");
     expect(app.root.text).toContain("Provider unavailable");
+    const retrying = button.onclick!();
+    const retry = app.messages.filter((m) => m.method === "tools/call").at(-1)!;
+    expect(retry.id).not.toBe(request.id);
     const { payload } = await resultFixture();
     payload.structuredContent.housing.options[0].title =
       '<img src=x onerror="attack()">';
-    app.send({
-      jsonrpc: "2.0",
-      method: "ui/notifications/tool-result",
-      params: payload,
-    });
+    app.send({ jsonrpc: "2.0", id: retry.id, result: payload });
+    await retrying;
     expect(app.root.text).toContain('<img src=x onerror="attack()">');
     expect(quizHtml).not.toContain("innerHTML");
     expect(app.root.querySelector("img")).toBeNull();

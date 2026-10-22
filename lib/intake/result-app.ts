@@ -78,13 +78,7 @@ export const resultRenderer = String.raw`
     }
     if(plan.move.transport!=='fly'){const route=section('The journey');mapView(route,meta?.map,plan.move.origin+' to '+plan.move.destination);
     route.append(element('p',plan.route.status==='live'?plan.route.distanceMiles+' miles · about '+plan.route.durationHours+' hours driving · '+plan.route.source:plan.route.warning));}
-    if(plan.flights){
-      const flights=section('Flight options');
-      flights.append(element('p','Example schedules for '+plan.move.origin+' → '+plan.move.destination+' · '+plan.flights.departureDate+(plan.flights.isDemoData?' · Demo data':'')));
-      if(plan.flights.connections.length)table(flights,['Route','Example schedule'],plan.flights.connections.map(connection=>[connection.stops===0?'Nonstop':connection.stops+' stop',connection.segments.map(segment=>segment.airline+' '+segment.flightNumber+' · '+segment.originAirport+' '+segment.departureTime+' → '+segment.destinationAirport+' '+segment.arrivalTime).join(' / ')]));
-      else flights.append(element('p','No flight examples available for this search.','empty'));
-      if(plan.flights.isDemoData)flights.append(element('p','Fictional schedules and availability.','caption'));
-    }
+
     const housing=section('Homes to compare');
     const bedroomFilter=plan.move.minBedrooms>0?' · '+plan.move.minBedrooms+'+ bedrooms':' · Any bedrooms';
     housing.append(element('p',plan.move.needsHousing?money(plan.move.maxRent)+'/month maximum'+bedroomFilter:'You said housing is already arranged.'));
@@ -112,7 +106,7 @@ export const resultRenderer = String.raw`
     const strategies=element('div','','service-strategies');services.append(strategies);strategies.append(element('h3','Ways to make the move'),element('p','Compare these planning estimates before requesting a provider quote. Estimates cover travel and moving services, excluding the rest of your moving budget.','caption'));plan.strategies.forEach(strategy=>{const block=element('div','','strategy');block.append(element('h4',strategy.label+' · '+money(strategy.cost)),element('p',strategy.transport+' · '+strategy.service+'. '+strategy.explanation));strategies.append(block)});
     const next=section('What to do next');next.append(element('p',plan.readiness.nextAction,'briefing'));const blockers=element('ul');plan.readiness.blockers.forEach(blocker=>blockers.append(element('li',blocker.action)));next.append(blockers);
     const assumptions=element('details');assumptions.open=true;assumptions.append(element('summary','Assumptions and unconfirmed details'));const list=element('ul');plan.assumptions.forEach(text=>list.append(element('li',text)));assumptions.append(list);page.append(assumptions);
-    const provenance=section('Sources and data status');table(provenance,['Data','Provider','Status / checked'],[...(plan.move.transport==='fly'?[]:[['Route',plan.route.source||'Mapbox',plan.route.status]]),['Housing',plan.housing.source,plan.housing.status+' · '+plan.housing.fetchedAt],['Moving services',plan.movers.source,plan.movers.status+' · '+plan.movers.fetchedAt],...(plan.flights?[['Flights',plan.flights.source,plan.flights.isDemoData?'Demo examples':plan.flights.status]]:[]),['Budget and timeline',plan.budget.estimateSource==='model'?'GPT estimates / MoveFlow checklist':plan.budget.estimateSource==='user'?'User estimates / MoveFlow checklist':'MoveFlow planning rules','Estimates / checklist']]);
+    const provenance=section('Sources and data status');table(provenance,['Data','Provider','Status / checked'],[...(plan.move.transport==='fly'?[]:[['Route',plan.route.source||'Mapbox',plan.route.status]]),['Housing',plan.housing.source,plan.housing.status+' · '+plan.housing.fetchedAt],['Moving services',plan.movers.source,plan.movers.status+' · '+plan.movers.fetchedAt],['Budget and timeline',plan.budget.estimateSource==='model'?'GPT estimates / MoveFlow checklist':plan.budget.estimateSource==='user'?'User estimates / MoveFlow checklist':'MoveFlow planning rules','Estimates / checklist']]);
     [plan.housing.warning,plan.movers.warning].filter(Boolean).forEach(text=>provenance.append(element('p',text,'caption')));
     page.append(element('footer','Generated '+plan.generatedAt+' · This plan is not saved to an account.'));
     resize();
