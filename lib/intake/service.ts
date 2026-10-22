@@ -160,9 +160,22 @@ export async function prepareIntake(
   prompt: string,
   known: IntakeFields = {},
   context: IntakeFields = {},
+  contextText = "",
 ) {
   let extracted: IntakeFields = {};
   let extractionFailed = false;
+  let extractedContext: IntakeFields = {};
+  if (contextText.trim()) {
+    try {
+      extractedContext = await extractRelocationDetails(contextText);
+    } catch (error) {
+      if (!(error instanceof PlanError)) throw error;
+      throw new PlanError(
+        "Your move context could not be interpreted. Please retry or continue without it.",
+        503,
+      );
+    }
+  }
   if (prompt) {
     try {
       extracted = await extractRelocationDetails(prompt);
@@ -180,7 +193,13 @@ export async function prepareIntake(
     if (normalized) request[field] = normalized.name;
   }
   // A new, explicit request wins over saved context, including typed structured values.
-  const view = await enrichIntake(beginIntake(request, context, prompt));
+  const state = beginIntake(
+    request,
+    { ...context, ...extractedContext },
+    prompt,
+  );
+  if (contextText.trim()) state.contextIncluded = true;
+  const view = await enrichIntake(state);
   return extractionFailed
     ? {
         ...view,

@@ -46,6 +46,57 @@ export async function writeProfile(owner: string, context: unknown) {
     ON CONFLICT (owner_hash) DO UPDATE SET context = EXCLUDED.context, updated_at = now()`;
   return fields;
 }
+// Older profiles stored individual fields. Keep all their values visible when
+// moving to the single free-text profile, without rewriting them on read.
+export function profileAsText(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  const profile = value as Record<string, unknown>;
+  if (typeof profile.text === "string") return profile.text;
+  const labels: Record<string, string> = {
+    origin: "Moving from",
+    destination: "Moving to",
+    movingDate: "Moving date",
+    flexible: "Flexible date",
+    budget: "Total move budget (USD)",
+    adults: "Adults",
+    children: "Children",
+    pets: "Pets",
+    bedrooms: "Bedrooms",
+    minBedrooms: "Minimum bedrooms",
+    suitcases: "Suitcases",
+    furniture: "Moving furniture",
+    transport: "Travel preference",
+    needsHousing: "Needs housing",
+    maxRent: "Monthly rent limit (USD)",
+    petFriendly: "Pet-friendly housing",
+    neighborhood: "Neighborhood",
+    workInfo: "Work and commute",
+    petInfo: "Pet details",
+    accessibilityNeeds: "Accessibility needs",
+    otherNeeds: "Other preferences",
+    scenario: "Household scenario",
+  };
+  return Object.entries(profile)
+    .filter(
+      ([, item]) =>
+        item !== null &&
+        item !== undefined &&
+        ["string", "number", "boolean"].includes(typeof item),
+    )
+    .map(([key, item]) => `${labels[key] ?? key}: ${item}`)
+    .join("\n");
+}
+export async function readProfileText(owner: string) {
+  const rows =
+    await database()`SELECT context FROM relocation_profiles WHERE owner_hash = ${owner}`;
+  return profileAsText(rows[0]?.context);
+}
+export async function writeProfileText(owner: string, text: string) {
+  const value = z.string().max(8000).parse(text);
+  await database()`INSERT INTO relocation_profiles (owner_hash, context) VALUES (${owner}, ${JSON.stringify({ text: value })}::jsonb)
+    ON CONFLICT (owner_hash) DO UPDATE SET context = EXCLUDED.context, updated_at = now()`;
+  return value;
+}
 export function savedIntakeView(record: IntakeRecord): SavedIntakeView {
   record = currentRecord(record);
   return {

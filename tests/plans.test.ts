@@ -48,6 +48,8 @@ import {
   updateIntake,
   completeSavedIntake,
   readProfile,
+  readProfileText,
+  writeProfileText,
   writeProfile,
 } from "@/lib/intake/repository";
 
@@ -187,6 +189,23 @@ describe("saved adaptive intake", () => {
     await expect(getIntake(saved.id, "owner-b")).rejects.toMatchObject({
       status: 404,
     });
+  });
+  it("converts legacy profiles to text and saves free-text profiles per owner", async () => {
+    await writeProfile("owner-a", {
+      adults: 2,
+      children: 0,
+      pets: 1,
+      maxRent: 2800,
+      workInfo: "Remote work",
+    });
+    const legacy = await readProfileText("owner-a");
+    expect(legacy).toContain("Adults: 2");
+    expect(legacy).toContain("Children: 0");
+    expect(legacy).toContain("Monthly rent limit (USD): 2800");
+    expect(legacy).toContain("Work and commute: Remote work");
+    await writeProfileText("owner-a", "One adult and a dog.");
+    expect(await readProfileText("owner-a")).toBe("One adult and a dog.");
+    expect(await readProfileText("owner-b")).toBe("");
   });
   it("resumes answers, supports back, and rejects stale writes", async () => {
     const start = await createIntake(

@@ -3,7 +3,7 @@ import { intakeFieldsSchema } from "@/lib/intake/schema";
 import {
   createIntake,
   latestIntake,
-  readProfile,
+  readProfileText,
 } from "@/lib/intake/repository";
 import { prepareIntake } from "@/lib/intake/service";
 import { errorResponse } from "@/lib/plans/errors";
@@ -16,6 +16,7 @@ const schema = z
     known: intakeFieldsSchema.default({}),
     includeContext: z.boolean().default(false),
     context: intakeFieldsSchema.optional(),
+    contextText: z.string().max(8000).optional(),
   })
   .strict();
 export async function GET() {
@@ -33,10 +34,16 @@ export async function POST(request: Request) {
   try {
     const body = schema.parse(await readJson(request));
     const { owner } = await getSession(true);
-    const context = body.includeContext
-      ? (body.context ?? (await readProfile(owner)))
-      : {};
-    const view = await prepareIntake(body.prompt, body.known, context);
+    const context = body.includeContext ? (body.context ?? {}) : {};
+    const contextText = body.includeContext
+      ? (body.contextText ?? (body.context ? "" : await readProfileText(owner)))
+      : "";
+    const view = await prepareIntake(
+      body.prompt,
+      body.known,
+      context,
+      contextText,
+    );
     return Response.json(
       { intake: await createIntake(owner, body.requestId, view.state) },
       { status: 201 },

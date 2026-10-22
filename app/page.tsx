@@ -7,18 +7,14 @@ import { LandingPage } from "@/widgets/landing/ui/landing-page";
 import { MoveContext } from "@/features/move-intake/ui/move-context";
 import { MoveIntake } from "@/features/move-intake/ui/move-intake";
 import { Button } from "@/components/ui/button";
-import type {
-  IntakeAnswer,
-  IntakeFields,
-  SavedIntakeView,
-} from "@/lib/intake/schema";
+import type { IntakeAnswer, SavedIntakeView } from "@/lib/intake/schema";
 
 export default function Home() {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   const [includeContext, setIncludeContext] = useState(false);
-  const [moveContext, setMoveContext] = useState<IntakeFields>({});
+  const [moveContext, setMoveContext] = useState("");
   const [intake, setIntake] = useState<SavedIntakeView>();
   const [resumable, setResumable] = useState<SavedIntakeView>();
   const active = useRef(false);
@@ -107,7 +103,7 @@ export default function Home() {
       {
         prompt,
         includeContext,
-        context: includeContext ? moveContext : undefined,
+        contextText: includeContext ? moveContext : undefined,
         requestId: attempt.current.id,
       },
       "POST",

@@ -281,6 +281,52 @@ describe("shared UI and MCP move intake", () => {
     expect(view.state.fields.origin).toBe("Fargo, ND");
     expect(view.state.fields.destination).toBe("Washington");
   });
+  it("extracts free-text context and gives the current request priority", async () => {
+    vi.mocked(extractRelocationDetails)
+      .mockResolvedValueOnce({
+        adults: 2,
+        children: 1,
+        pets: 1,
+        workInfo: "Remote work",
+      })
+      .mockResolvedValueOnce({
+        adults: 1,
+        children: 0,
+        origin: "Fargo, ND",
+        destination: "Seattle, WA",
+      });
+    const view = await prepareIntake(
+      "Moving alone from Fargo to Seattle",
+      {},
+      {},
+      "Two adults and a child, with a dog. Remote work.",
+    );
+    expect(view.state.fields).toMatchObject({
+      adults: 1,
+      children: 0,
+      pets: 1,
+      workInfo: "Remote work",
+    });
+    expect(view.state.sources).toMatchObject({
+      adults: "request",
+      pets: "saved_context",
+    });
+    expect(view.state.contextIncluded).toBe(true);
+    expect(view.questions.some((question) => question.id === "household")).toBe(
+      false,
+    );
+    expect(
+      view.questions.some((question) => question.id === "movingDate"),
+    ).toBe(true);
+  });
+  it("does not silently discard included context if extraction fails", async () => {
+    vi.mocked(extractRelocationDetails).mockRejectedValueOnce(
+      new PlanError("unavailable", 503),
+    );
+    await expect(
+      prepareIntake("Move me", {}, {}, "One adult and a dog"),
+    ).rejects.toThrow("move context could not be interpreted");
+  });
   it("prefers explicit structured fields over conflicting extracted fields", async () => {
     vi.mocked(extractRelocationDetails).mockResolvedValueOnce({
       origin: "Austin, TX",

@@ -4,7 +4,7 @@ import {
   createIntake,
   getIntake,
   completeSavedIntake,
-  readProfile,
+  readProfileText,
 } from "@/lib/intake/repository";
 import { prepareIntake } from "@/lib/intake/service";
 import { getSession, readJson } from "@/lib/plans/session";
@@ -24,7 +24,8 @@ export async function POST(request: Request) {
     const view = await prepareIntake(
       body.prompt,
       {},
-      body.includeContext ? await readProfile(owner) : {},
+      {},
+      body.includeContext ? await readProfileText(owner) : "",
     );
     const intake = await createIntake(owner, body.requestId, view.state);
     if (!intake.ready)
