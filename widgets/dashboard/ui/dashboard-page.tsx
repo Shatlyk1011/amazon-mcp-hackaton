@@ -29,6 +29,8 @@ import { MoverPanel } from "@/widgets/dashboard/ui/mover-panel";
 import { McpActivity, type Trace } from "@/widgets/dashboard/ui/mcp-explorer";
 import type { RouteResult } from "@/lib/providers/mapbox";
 import { MoveSetupSummary } from "./move-setup-summary";
+import { FlightSchedulesPanel } from "./flight-schedules-panel";
+import type { FlightScheduleResult } from "@/lib/providers/demo-flights";
 
 function ToolSource({ tool }: { tool: string }) {
   return (
@@ -46,6 +48,7 @@ export function DashboardPage({
   input,
   traces,
   route,
+  flightSchedules,
   housing = [],
   movers = [],
   housingBrowseUrl = "https://www.zillow.com/",
@@ -61,6 +64,7 @@ export function DashboardPage({
   input: RelocationInput;
   traces: Trace[];
   route: RouteResult | null;
+  flightSchedules?: FlightScheduleResult | null;
   housing?: Housing[];
   movers?: Mover[];
   housingBrowseUrl?: string;
@@ -283,6 +287,12 @@ export function DashboardPage({
                 warning={movingServicesWarning}
               />
             </div>
+            {flightSchedules ? (
+              <div className="mt-10 flex flex-col gap-4">
+                <ToolSource tool="suggest_flight_connections" />
+                <FlightSchedulesPanel schedules={flightSchedules} />
+              </div>
+            ) : null}
             <MoveSetupSummary
               referenceDate={referenceDate}
               input={input}

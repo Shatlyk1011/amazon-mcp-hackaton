@@ -389,11 +389,13 @@ export function PlanWorkspace({
       referenceDate={plan.result.generatedAt.slice(0, 10)}
       input={plan.input}
       route={plan.result.route}
+      flightSchedules={plan.result.flightSchedules}
       housing={plan.result.housing}
       movers={plan.result.movers}
-      traces={[...plan.result.traces, ...requests.flatMap((item) => item.tools)]
-        .filter((trace) => trace.tool !== "suggest_flight_connections")
-        .slice(-40)}
+      traces={[
+        ...plan.result.traces,
+        ...requests.flatMap((item) => item.tools),
+      ].slice(-40)}
       housingBrowseUrl={plan.result.housingBrowseUrl}
       movingServicesSource={plan.result.movingServicesSource}
       movingServicesWarning={plan.result.movingServicesWarning}

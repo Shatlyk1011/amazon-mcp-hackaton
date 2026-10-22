@@ -290,8 +290,11 @@ describe("MoveFlow final result", () => {
     expect(plan.housing.options.map((h) => h.id)).toEqual(["match"]);
     expect(plan.housing.excludedCount).toBe(3);
     expect(plan.movers.options[0].sourceUrl).toBeUndefined();
-    expect(plan).not.toHaveProperty("flights");
-    expect(payload.content[0].text).not.toContain("Flight examples");
+    expect(plan.flights?.isDemoData).toBe(true);
+    expect(plan.flights?.connections[0].segments[0].flightNumber).toBe(
+      "DEMO 101",
+    );
+    expect(payload.content[0].text).toContain("fictional demo schedules");
     expect(JSON.stringify(plan)).not.toContain("geometry");
     expect(JSON.stringify(plan)).not.toContain("traces");
     expect(JSON.stringify(plan).length).toBeLessThan(16_000);
@@ -339,13 +342,13 @@ describe("MoveFlow final result", () => {
     expect(plan.movers.options).toEqual([]);
     expect(plan.movers.status).toBe("unavailable");
   });
-  it("omits flight examples and driving warnings for an airplane-only move", async () => {
+  it("shows demo flight examples without driving warnings for an airplane-only move", async () => {
     const { result } = await resultFixture();
     const plan = buildPlanPresentation(
       { ...result, input: { ...result.input, transport: "fly" }, route: null },
       state,
     );
-    expect(movePlanText(plan)).not.toContain("DEMO 101");
+    expect(movePlanText(plan)).toContain("DEMO 101");
     expect(movePlanText(plan)).not.toContain(
       "Live driving directions are unavailable",
     );
@@ -355,7 +358,7 @@ describe("MoveFlow final result", () => {
       method: "ui/notifications/tool-result",
       params: { structuredContent: plan },
     });
-    expect(app.root.text).not.toContain("DEMO 101");
+    expect(app.root.text).toContain("DEMO 101");
     expect(app.root.text).not.toContain(
       "Live driving directions are unavailable",
     );
@@ -802,9 +805,15 @@ describe("shipped app bridge", () => {
     await Promise.resolve();
     expect(app.root.text).toContain("Homes to compare");
     expect(app.root.text).toContain("Moving budget");
+    expect(app.root.text).toContain("Budget overview");
+    expect(app.root.text).toContain("Current budget");
+    expect(app.root.text).toContain("Required budget breakdown");
+    expect(app.root.text).toContain("First month of rent");
+    expect(app.root.text).toContain("Travel and luggage");
+    expect(app.root.text).not.toContain("Assumptions and unconfirmed details");
     expect(app.root.text).not.toContain("Your timeline");
-    expect(app.root.text).not.toContain("Flight options");
-    expect(app.root.text).not.toContain("DEMO 101");
+    expect(app.root.text).toContain("Flight options");
+    expect(app.root.text).toContain("DEMO 101");
     expect(app.root.text).toContain("Sources and data status");
     expect(app.messages.map((m) => m.method)).not.toContain("ui/message");
     expect(app.messages.map((m) => m.method)).not.toContain(

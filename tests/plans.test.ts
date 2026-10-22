@@ -67,6 +67,7 @@ function fixture(input = demoFamily): PlanResult {
       source: "Test",
       status: "fallback",
     },
+    flightSchedules: null,
     housing: [
       {
         id: "house-1",
@@ -254,7 +255,7 @@ describe("saved adaptive intake", () => {
 });
 
 describe("saved plans with PostgreSQL", () => {
-  it("excludes legacy demo flights from saved plan responses", async () => {
+  it("preserves legacy demo flights in saved plan responses", async () => {
     const plan = await readyPlan();
     const legacy = {
       ...plan.result!,
@@ -273,8 +274,8 @@ describe("saved plans with PostgreSQL", () => {
       [JSON.stringify(legacy), plan.id],
     );
     const loaded = await getPlan(plan.id, "owner-a");
-    expect(loaded.result).not.toHaveProperty("flightSchedules");
-    expect(loaded.result?.traces).toEqual([]);
+    expect(loaded.result?.flightSchedules).toEqual(legacy.flightSchedules);
+    expect(loaded.result?.traces).toEqual(legacy.traces);
   });
   it("deduplicates submissions and enforces ownership without returning secrets", async () => {
     const key = randomUUID();
