@@ -307,6 +307,14 @@ export function MoveIntake({
                 </div>
               </FieldGroup>
             </form>
+          ) : pending ? (
+            <p
+              role="status"
+              className="flex items-center gap-2 text-sm text-muted-foreground"
+            >
+              <LoaderCircle className="size-4 animate-spin" />
+              Building your dashboard…
+            </p>
           ) : (
             <>
               <dl className="grid gap-4 sm:grid-cols-2">

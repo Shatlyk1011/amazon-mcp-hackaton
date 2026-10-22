@@ -16,7 +16,7 @@ ${planEditorStyles}
 <script>
 (() => {
   const root = document.getElementById('app');
-  let view, busy = false, nextId = 0, currentPlanMeta;
+  let view, busy = false, building = false, buildError, nextId = 0, currentPlanMeta;
   const pending = new Map();
   const notify = (method, params) => parent.postMessage({jsonrpc:'2.0',method,params}, '*');
   const request = (method, params) => new Promise((resolve,reject) => {
@@ -42,17 +42,30 @@ ${resultRenderer}
     if(result && result.isError) { const error=new Error(result.content?.[0]?.text || 'Could not save your answer.'); error.toolMessage=true; throw error; }
     if(result?.structuredContent?.status==='ready'){renderPlan(result.structuredContent,result._meta?.moveflow);return;}
     if(!result?.structuredContent?.state) throw new Error('The quiz response was incomplete.');
-    view=result.structuredContent; render();
+    view=result.structuredContent; buildError=undefined; render();
+    if(view.ready) void buildPlan();
+  }
+  async function buildPlan() {
+    if(building)return;
+    building=true; buildError=undefined; render();
+    try {
+      update(await request('tools/call',{name:'generate_move_plan',arguments:{state:view.state}}));
+    } catch(e) {
+      buildError=e?.toolMessage ? e.message : 'The plan could not be built. Your answers are still here; please try again.';
+      render();
+    } finally { building=false; }
   }
   function render() {
     root.replaceChildren();
     if(view.ready){
-      root.append(element('h1','Your move setup is ready'),element('p','Build your moving plan to compare homes, adjust the budget, and review your next steps here.'));
-      const list=element('p',view.summary.map(f => f.field + ': ' + f.value).join('\n'),'summary'); root.append(list);
-      const button=element('button','Build my moving plan'); root.append(button);
-      button.onclick=async()=>{if(busy)return;busy=true;button.disabled=true;button.textContent='Building your plan…';root.querySelector('.error')?.remove();try{
-        update(await request('tools/call',{name:'generate_move_plan',arguments:{state:view.state}}));
-      }catch(e){button.disabled=false;button.textContent='Retry building my plan';showError(e?.toolMessage ? e.message : 'The plan could not be built. Your answers are still here; please try again.');}finally{busy=false;}};
+      if(buildError){
+        root.append(element('h1','Your plan could not be built'),element('p','Your answers are still here.'));
+        const button=element('button','Retry building my plan'); root.append(button);
+        button.onclick=()=>buildPlan();
+        showError(buildError);
+      }else{
+        root.append(element('h1','Building your moving plan…'),element('p','We’re preparing your budget, housing options, moving services, and next steps.'));
+      }
       resize(); return;
     }
     const q=view.nextQuestion; if(!q){showError('No question is available. Continue in the conversation.');return;}
