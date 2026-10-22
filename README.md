@@ -153,7 +153,7 @@ MCP hosts can pass relevant facts the user previously shared (for example, adult
 
 `prepare_move_intake` advertises `ui://moveflow/quiz-v4.html`; `generate_move_plan` advertises `ui://moveflow/plan-v3.html`. The quiz calls the intake and plan tools directly. The plan widget calls `update_move_plan` and synchronizes context when supported.
 
-A successful `generate_move_plan` puts the presentation directly in `structuredContent` (`status`, `state`, `move`, `route`, `housing`, `movers`, `budget`, `strategies`, `timeline`, `readiness`, `briefing`, and `assumptions`), not in `structuredContent.result`. `content[0].text` is readable text. Map rendering data is delivered in `_meta.moveflow.map` and `_meta.moveflow.housingMap`. Retain the returned `state`, including `expenseEstimates`, for subsequent updates. `maxRent` filters rentals independently of assumed monthly rent.
+A successful `generate_move_plan` puts the presentation directly in `structuredContent` (`status`, `state`, `move`, `route`, `housing`, `movers`, `flights`, `budget`, `strategies`, `timeline`, `readiness`, `briefing`, and `assumptions`), not in `structuredContent.result`. `content[0].text` is readable text. Map rendering data is delivered in `_meta.moveflow.map` and `_meta.moveflow.housingMap`. Retain the returned `state`, including `expenseEstimates`, for subsequent updates. `maxRent` filters rentals independently of assumed monthly rent.
 
 ## Architecture and data
 
