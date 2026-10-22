@@ -1,99 +1,59 @@
 # MoveFlow
 
-MoveFlow is a relocation planning app with a stateless public MCP server and a persistent, browser-session-scoped dashboard. It uses an adaptive interview to collect move requirements, generates plans from provider data and estimates, and uses OpenAI tool calls to update saved plans.
+MoveFlow is a U.S. relocation planner with a public MCP server and a browser dashboard. It collects move requirements through an adaptive interview, generates a plan using provider data and estimates, and lets users refine saved plans with an OpenAI-powered assistant.
 
-- App: https://amazon-mcp-hackaton.vercel.app/
-- Public MCP endpoint: https://amazon-mcp-hackaton.vercel.app/api/mcp
-- Transport: Streamable HTTP; no client credentials required
+- **Live app:** https://amazon-mcp-hackaton.vercel.app/
+- **MCP endpoint:** https://amazon-mcp-hackaton.vercel.app/api/mcp
+- **Transport:** Streamable HTTP, stateless, no client credentials
+- **MCP protocol:** `2025-11-25` supported
+- **Hackathon track:** Amazon Developer Hackathon — Alexa+ self-hosted MCP server
+- **Stack:** Next.js, TypeScript, MCP TypeScript SDK, Neon PostgreSQL, OpenAI, Mapbox, RentCast, and TomTom
 
-## Connect the MCP server
+## Connect an MCP client
 
-Connect an MCP-compatible assistant on any device to `https://amazon-mcp-hackaton.vercel.app/api/mcp` using Streamable HTTP. No local installation of MoveFlow or client credentials are needed. The deployed server must be reachable from the client.
-
-### Codex CLI and IDE extension
-
-Run on each device:
+Configure an MCP-compatible client with the endpoint above and Streamable HTTP. For example, with Codex CLI:
 
 ```bash
 codex mcp add moveflow --url https://amazon-mcp-hackaton.vercel.app/api/mcp
 codex mcp list
 ```
 
-Alternatively, add this to `~/.codex/config.toml`:
+Alternatively, configure the server manually in `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.moveflow]
 url = "https://amazon-mcp-hackaton.vercel.app/api/mcp"
 ```
 
-The CLI and IDE extension share this configuration on the same machine. Start a new session and ask, for example, “Use MoveFlow to help me plan a move from Boston to Austin.” See the [Codex MCP setup guide](https://developers.openai.com/learn/docs-mcp).
+The Codex CLI and IDE extension share this configuration on the same machine.
 
-### Claude Code
+Start a new session and ask: “Use MoveFlow to help me plan a move from Boston to Austin.” Other clients can use the same URL; see their MCP configuration documentation.
 
-Run the following to make MoveFlow available across projects on the device. Omit `--scope user` to configure only the current project.
+The public server is stateless. Clients must retain and pass the returned plan state when updating it. Dashboard plans are browser-session-scoped and do not automatically sync with external clients. Interactive widgets require an MCP Apps-compatible host; other clients can use text and structured results.
+
+## Verify the protocol
+
+Send an initialization request to the deployed server:
 
 ```bash
-claude mcp add --transport http --scope user moveflow https://amazon-mcp-hackaton.vercel.app/api/mcp
-claude mcp list
-```
-
-Use `/mcp` in Claude Code to check the connection.
-
-### VS Code with GitHub Copilot
-
-Add the server to `.vscode/mcp.json` in the project:
-
-```json
-{
-  "servers": {
-    "moveflow": {
-      "type": "http",
-      "url": "https://amazon-mcp-hackaton.vercel.app/api/mcp"
+curl -sS https://amazon-mcp-hackaton.vercel.app/api/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {},
+      "clientInfo": { "name": "protocol-check", "version": "1.0.0" }
     }
-  }
-}
+  }'
 ```
 
-Open Copilot Chat in Agent mode and enable MoveFlow in the tools picker. See the [VS Code MCP configuration reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration) for user-profile configuration.
+The response should contain `"protocolVersion":"2025-11-25"`. Use an MCP client to complete initialization, discover tools, and call one. The integration tests below exercise discovery and calls through a real Streamable HTTP client against the local handler.
 
-### Cursor
-
-Add the server to `~/.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "moveflow": {
-      "url": "https://amazon-mcp-hackaton.vercel.app/api/mcp"
-    }
-  }
-}
-```
-
-Restart Cursor and ask its agent to use MoveFlow.
-
-### ChatGPT and cloud agents
-
-In ChatGPT on the web, open **Plugins → + → Add custom MCP server**, name it MoveFlow, enter the endpoint, and select the no-authentication option. Install the resulting plugin and select it in a new chat. Availability depends on account and workspace settings; see [Add a custom MCP server](https://developers.openai.com/api/docs/guides/custom-mcp-server).
-
-Cloud environments need their own MCP configuration and network access to the endpoint; local Codex configuration does not automatically transfer. For the OpenAI Agents API, add the following to `agent.tools` as described in the [MCP connections guide](https://developers.openai.com/api/docs/guides/agents-api/tools/mcp):
-
-```json
-{
-  "type": "mcp",
-  "server_label": "moveflow",
-  "transport": {
-    "type": "http",
-    "server_url": "https://amazon-mcp-hackaton.vercel.app/api/mcp"
-  },
-  "connection_origin": "service",
-  "required": true
-}
-```
-
-Other MCP clients can use the same URL and Streamable HTTP transport; consult the client's documentation for its configuration format. The public server is stateless, so conversations and plan state do not automatically sync between clients. Dashboard plans are scoped to a browser session, and cross-device login is not currently available. Interactive widgets require a host that supports MCP Apps; other hosts can use the tools' text and structured results.
-
-## Setup
+## Run locally
 
 Use Node.js 22+ and pnpm.
 
@@ -123,7 +83,7 @@ APP_URL=http://localhost:3000
 
 For deployment, set `APP_URL` to the exact HTTPS application origin. The server-side MCP client uses this configured origin, never a model-provided URL or untrusted Host header. It must be reachable by the application's server.
 
-## Sample prompts
+## Try it
 
 Start a move in the app or an MCP-compatible assistant:
 
@@ -177,3 +137,11 @@ pnpm build
 Tests execute the schema and repository SQL in embedded PostgreSQL (PGlite) and use a real MCP client/HTTP transport against the handler. OpenAI responses and provider searches are fixtures, so tests require no API keys and make no paid model calls.
 
 For live verification after configuration: submit a form, note the URL, reload, send a rent-limit change, select an apartment, and reload again. Confirm the same ID, updated data, request history, and saved selection. An incognito browser should not access that plan.
+
+## Hackathon submission
+
+This project enters the Alexa+ track as a self-hosted MCP server. Development began on October 12, 2026; the relocation planner, MCP tools, provider integrations, persistent plans, and assistant were added subsequently. 
+
+## License
+
+[MIT](LICENSE).
