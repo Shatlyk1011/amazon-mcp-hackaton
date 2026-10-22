@@ -288,9 +288,10 @@ describe("public MCP standalone contracts", () => {
         name: "prepare_move_intake",
         arguments: { known, savedContext: { pets: 2 }, includeContext: false },
       });
-      const view = JSON.parse(
-        (prepared.content as { type: string; text: string }[])[0].text,
-      );
+      const view = prepared.structuredContent as {
+        nextQuestion: { id: string };
+        state: { fields: Record<string, unknown> };
+      };
       expect(view.nextQuestion.id).toBe(
         intakeView(beginIntake(known)).nextQuestion?.id,
       );
@@ -308,7 +309,7 @@ describe("public MCP standalone contracts", () => {
       await client.close();
     }
   });
-  it("exposes the quiz resource and keeps text and structured intake results in sync", async () => {
+  it("directs users to the quiz while retaining structured intake data", async () => {
     const client = await connectPublic();
     try {
       const tools = await client.listTools();
@@ -318,6 +319,7 @@ describe("public MCP standalone contracts", () => {
       expect(prepare?._meta?.ui).toEqual({
         resourceUri: "ui://moveflow/quiz-v4.html",
       });
+      expect(prepare?.description).toContain("do not repeat its questions");
       const resource = await client.readResource({
         uri: "ui://moveflow/quiz-v4.html",
       });
@@ -328,12 +330,15 @@ describe("public MCP standalone contracts", () => {
         "text",
         expect.stringContaining("answer_move_intake"),
       );
+      expect(
+        resource.contents[0]._meta?.["openai/widgetDescription"],
+      ).toContain("interactive quiz");
       const result = await client.callTool({
         name: "prepare_move_intake",
         arguments: { known: { origin: "Boston, MA" } },
       });
-      expect(result.structuredContent).toEqual(
-        JSON.parse((result.content as { text: string }[])[0].text),
+      expect((result.content as { text: string }[])[0].text).toBe(
+        "The MoveFlow interactive quiz is ready. Complete the questions in the widget.",
       );
       expect(
         (result.structuredContent as { nextQuestion: { id: string } })

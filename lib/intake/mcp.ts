@@ -97,11 +97,13 @@ async function generateMoveResult(
     };
   }
 }
-async function output(work: () => Promise<unknown>) {
+async function output(work: () => Promise<unknown>, text?: string) {
   try {
     const result = await work();
     return {
-      content: [{ type: "text" as const, text: JSON.stringify(result) }],
+      content: [
+        { type: "text" as const, text: text ?? JSON.stringify(result) },
+      ],
       structuredContent: result as Record<string, unknown>,
     };
   } catch (error) {
@@ -145,7 +147,9 @@ export function registerIntakeTools(server: McpServer) {
             text: quizHtml,
             _meta: {
               "openai/widgetDescription":
-                "MoveFlow renders an editable moving plan: maps, housing, estimated expenses, preferences, timeline, and sources. The Update plan button refreshes this app in place without posting a chat message.",
+                resourceUri === quizResourceUri
+                  ? "MoveFlow displays an interactive quiz that presents the current question and options, collects each answer, advances the intake, and builds the moving plan. Do not repeat the question, options, or summary outside the widget."
+                  : "MoveFlow renders an editable moving plan: maps, housing, estimated expenses, preferences, timeline, and sources. The Update plan button refreshes this app in place without posting a chat message.",
               ui: {
                 csp: {
                   connectDomains: [],
@@ -162,7 +166,7 @@ export function registerIntakeTools(server: McpServer) {
     "prepare_move_intake",
     {
       description:
-        "Use this when someone wants help planning a move or relocation between US cities, such as “I’m moving from Boston to Austin” or “help me relocate to Denver.” Start an interactive moving-plan intake even if they do not mention MoveFlow. Include their actual words in prompt and put details explicitly stated in the current request in known. Also check available earlier conversation, user profile, or memory for relevant facts the user has provided, such as numbers of adults, children and pets, housing needs, accessibility and work preferences. Put applicable, sufficiently certain facts in savedContext and set includeContext to true so they can inform the move and avoid repeated questions. Send only relevant details the user intends to use for this move; do not send the full conversation or profile. Current request details override savedContext. Omit unknown, uncertain, outdated or conflicting facts; never invent or assume answers, including a breakdown of household members from a total alone. Do not use for a simple trip or flight search without a relocation request. If extractionWarning is returned, tell the user and review missing details. Do not answer questions or select options on the user’s behalf. Let the user complete the interactive quiz or ask them each returned question and wait for their answer before calling answer_move_intake. Returns ready, nextQuestion, summary and caller-owned state. When ready is true, immediately call generate_move_plan without asking for another confirmation. The server only uses context supplied in this call; it does not read the host’s conversation, browser sessions, profile or memory, and does not save data.",
+        "Use this when someone wants help planning a move or relocation between US cities, such as “I’m moving from Boston to Austin” or “help me relocate to Denver.” Start an interactive moving-plan intake even if they do not mention MoveFlow. Include their actual words in prompt and put details explicitly stated in the current request in known. Also check available earlier conversation, user profile, or memory for relevant facts the user has provided, such as numbers of adults, children and pets, housing needs, accessibility and work preferences. Put applicable, sufficiently certain facts in savedContext and set includeContext to true so they can inform the move and avoid repeated questions. Send only relevant details the user intends to use for this move; do not send the full conversation or profile. Current request details override savedContext. Omit unknown, uncertain, outdated or conflicting facts; never invent or assume answers, including a breakdown of household members from a total alone. Do not use for a simple trip or flight search without a relocation request. If extractionWarning is returned, tell the user and review missing details. Do not answer questions or select options on the user’s behalf. When the interactive widget is available, let it conduct the intake and build the plan; do not repeat its questions, options, or summary, create another quiz, or call answer_move_intake or generate_move_plan on its behalf. Respond only with a brief direction to use the MoveFlow widget. If the widget is unavailable or the user asks to continue in conversation, ask the returned question and wait for their answer before calling answer_move_intake; when ready is true, call generate_move_plan without another confirmation. Returns ready, nextQuestion, summary and caller-owned state. The server only uses context supplied in this call; it does not read the host’s conversation, browser sessions, profile or memory, and does not save data.",
       _meta: { ui: { resourceUri: quizResourceUri } },
       inputSchema: z.object({
         prompt: z
@@ -193,12 +197,14 @@ export function registerIntakeTools(server: McpServer) {
       annotations,
     },
     (args) =>
-      output(() =>
-        prepareIntake(
-          args.prompt,
-          args.known,
-          args.includeContext ? args.savedContext : {},
-        ),
+      output(
+        () =>
+          prepareIntake(
+            args.prompt,
+            args.known,
+            args.includeContext ? args.savedContext : {},
+          ),
+        "The MoveFlow interactive quiz is ready. Complete the questions in the widget.",
       ),
   );
   server.registerTool(

@@ -27,8 +27,8 @@ export function MoverPanel({
     <Card className="rounded-xl bg-white shadow-[0_1px_1px_rgba(0,0,0,0.04)] ring-[#ebebeb]">
       <CardHeader className="flex-row items-start justify-between">
         <div>
-          <CardTitle>
-            <Truck />
+          <CardTitle className="flex items-center gap-2">
+            <Truck aria-hidden="true" />
             Moving services
           </CardTitle>
           <CardDescription>
