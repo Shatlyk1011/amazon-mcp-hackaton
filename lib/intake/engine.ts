@@ -1,4 +1,4 @@
-import { groupCitiesByState } from "@mardillu/us-cities-utils";
+import { stateOnly } from "./cities";
 import { relocationInputSchema, type RelocationInput } from "@/lib/relocation";
 import { isUsLocation, US_ONLY_ERROR } from "@/lib/us-location";
 import { PlanError } from "@/lib/plans/errors";
@@ -12,23 +12,6 @@ import {
   type IntakeView,
 } from "./schema";
 
-const citiesByState = groupCitiesByState();
-const states = Object.entries(citiesByState).map(([abbreviation, cities]) => ({
-  name: cities[0]?.state ?? abbreviation,
-  abbreviation,
-  cities,
-}));
-// Accept a state name or postal abbreviation without treating it as a city.
-function stateOnly(value?: string) {
-  const text = value
-    ?.trim()
-    .toLowerCase()
-    .replace(/^state of /, "");
-  return states.find(
-    (s) =>
-      s.name.toLowerCase() === text || s.abbreviation?.toLowerCase() === text,
-  );
-}
 function cityNeeded(value?: string) {
   return (
     !value ||
@@ -88,25 +71,15 @@ export function beginIntake(
 function locationQuestion(
   id: "origin" | "destination",
   value?: string,
+  suggestions: string[] = [],
 ): IntakeQuestion {
   const state = stateOnly(value);
-  const popularByState: Record<string, string[]> = {
-    TX: ["Austin, TX", "Dallas, TX", "Houston, TX", "San Antonio, TX"],
-    NY: ["New York, NY", "Buffalo, NY", "Albany, NY"],
-    CA: ["Los Angeles, CA", "San Francisco, CA", "San Diego, CA"],
-  };
-  const popular =
-    (state &&
-      (popularByState[state.abbreviation] ??
-        [
-          ...new Set(state.cities.map((c) => `${c.name}, ${c.stateAbbr}`)),
-        ].slice(0, 4))) ??
-    [];
+  const popular = suggestions;
   return {
     id,
     title:
       id === "origin"
-        ? "Which city are you moving from?"
+        ? `Which city${state ? ` in ${state.name}` : ""} are you moving from?`
         : `Which city${state ? ` in ${state.name}` : ""} are you moving to?`,
     description:
       "A city lets us find the right route, homes, and local services.",
@@ -123,9 +96,17 @@ export function pendingQuestions(state: IntakeState): IntakeQuestion[] {
   const f = state.fields;
   const questions: IntakeQuestion[] = [];
   if (cityNeeded(f.origin))
-    questions.push(locationQuestion("origin", f.origin));
+    questions.push(
+      locationQuestion("origin", f.origin, state.citySuggestions?.origin),
+    );
   if (cityNeeded(f.destination))
-    questions.push(locationQuestion("destination", f.destination));
+    questions.push(
+      locationQuestion(
+        "destination",
+        f.destination,
+        state.citySuggestions?.destination,
+      ),
+    );
   if (f.adults === undefined || f.children === undefined)
     questions.push({
       id: "household",

@@ -49,6 +49,12 @@ export const intakeStateSchema = z
     sources: z.record(z.string(), factSourceSchema),
     contextIncluded: z.boolean(),
     rentGuidance: rentGuidanceSchema.optional(),
+    citySuggestions: z
+      .object({
+        origin: z.array(z.string().max(100)).max(3).optional(),
+        destination: z.array(z.string().max(100)).max(3).optional(),
+      })
+      .optional(),
     expenseEstimates: movingEstimatesSchema.optional(),
   })
   .strict();

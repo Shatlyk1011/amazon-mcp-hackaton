@@ -56,7 +56,7 @@ Use null for every detail the user did not state or clearly imply. Never invent 
 Scenario is family only when the user describes multiple adults or children; a pet alone does not make it a family move.
 Transport is compare only when the user asks to compare options; otherwise leave it null if unstated.
 When the user explicitly says they are moving alone, set adults to 1 and children to 0. Never assume they have no pets.
-Keep a destination state such as Texas as Texas; do not silently choose a city.
+For both origin and destination, preserve a specified city as a city (include its state when stated). If only a state is specified, retain the state name; correct obvious state-name misspellings and never choose a city for the user.
 Budget means the TOTAL one-time moving budget; maxRent means MONTHLY rent. Never use salary as either.
 Preserve work constraints, pet details, accessibility needs and other priorities as plain data in the corresponding fields.
 Return only the structured result.`,

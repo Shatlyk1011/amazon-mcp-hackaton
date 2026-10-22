@@ -79,13 +79,33 @@ describe("shared UI and MCP move intake", () => {
     expect(state.fields.pets).toBeUndefined();
     expect(state.fields.budget).toBeUndefined();
     expect(intakeView(state).nextQuestion?.id).toBe("destination");
-    expect(intakeView(state).nextQuestion?.options.map((o) => o.id)).toContain(
-      "Austin, TX",
-    );
+    expect(intakeView(state).nextQuestion?.options).toEqual([]);
     expect(() => completeIntake(state)).toThrow("Which city in Texas");
     expect(() =>
       answerIntake(state, { questionId: "destination", text: "TX" }),
     ).toThrow("choose a city");
+  });
+  it("renders saved suggestions for either city and accepts a manual city", () => {
+    const state = {
+      ...beginIntake({ origin: "New York", destination: "Texas" }, {}, "", now),
+      citySuggestions: { origin: ["Buffalo, NY"], destination: ["Austin, TX"] },
+    };
+    const questions = intakeView(state).questions;
+    expect(questions[0].options.map((option) => option.id)).toEqual([
+      "Buffalo, NY",
+    ]);
+    expect(questions[1].options.map((option) => option.id)).toEqual([
+      "Austin, TX",
+    ]);
+    expect(
+      answerIntake(state, { questionId: "origin", choice: "Buffalo, NY" })
+        .fields.origin,
+    ).toBe("Buffalo, NY");
+    const unknown = beginIntake({}, {}, "", now);
+    expect(
+      answerIntake(unknown, { questionId: "origin", text: "Austin, TX" }).fields
+        .origin,
+    ).toBe("Austin, TX");
   });
   it("skips the quiz for complete requirements and keeps context in the MCP plan input", () => {
     const state = beginIntake(full, {}, "", now);
@@ -225,6 +245,41 @@ describe("shared UI and MCP move intake", () => {
     expect(view.state.prompt).toBe("Moving from Chicago to Boston");
     expect(view.nextQuestion?.id).toBe("household");
     expect("extractionWarning" in view && view.extractionWarning).toBeTruthy();
+  });
+  it("recovers clearly stated states and a simple typo when extraction omits them", async () => {
+    vi.mocked(extractRelocationDetails).mockResolvedValueOnce({});
+    const view = await prepareIntake("moving from north dacota to washington");
+    expect(view.state.fields).toMatchObject({
+      origin: "North Dakota",
+      destination: "Washington",
+    });
+    expect(view.questions[0].title).toContain("North Dakota");
+    expect(view.questions[1].title).toContain("Washington");
+  });
+  it("recovers states after extraction failure without guessing ambiguous routes", async () => {
+    vi.mocked(extractRelocationDetails).mockRejectedValueOnce(
+      new PlanError("unavailable", 503),
+    );
+    const view = await prepareIntake("moving from north dacota to washington");
+    expect(view.state.fields).toMatchObject({
+      origin: "North Dakota",
+      destination: "Washington",
+    });
+    vi.mocked(extractRelocationDetails).mockResolvedValueOnce({});
+    const ambiguous = await prepareIntake(
+      "I am considering Washington and Oregon",
+    );
+    expect(ambiguous.state.fields.origin).toBeUndefined();
+    expect(ambiguous.state.fields.destination).toBeUndefined();
+  });
+  it("does not replace an extracted city with a prompt state", async () => {
+    vi.mocked(extractRelocationDetails).mockResolvedValueOnce({
+      origin: "Fargo, ND",
+      destination: "Washington",
+    });
+    const view = await prepareIntake("moving from north dacota to washington");
+    expect(view.state.fields.origin).toBe("Fargo, ND");
+    expect(view.state.fields.destination).toBe("Washington");
   });
   it("prefers explicit structured fields over conflicting extracted fields", async () => {
     vi.mocked(extractRelocationDetails).mockResolvedValueOnce({
