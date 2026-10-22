@@ -27,7 +27,7 @@ export const planEditorRenderer = String.raw`
     const preview=element('div','','preview'),total=element('div','','estimate-total'),balance=element('p','','caption');
     preview.append(element('div','Estimated upfront cash needed','eyebrow'),total,balance);form.append(preview);
     const source=plan.budget.estimateSource==='model'?'GPT planning estimates':plan.budget.estimateSource==='user'?'Your applied estimates':'MoveFlow planning rules';
-    form.append(element('p',source+'. Editable estimates, not live quotes or verified market averages.','caption'));
+    form.append(element('p',source+'. Editable estimates, not based on verified statistics or live quotes.','caption'));
     const group=element('fieldset');group.append(element('legend','Adjust estimated expenses (USD)'));form.append(group);
     const defaults={monthlyRent:plan.budget.monthlyRent,transportation:plan.budget.transportation,additional:plan.budget.additional+(plan.budget.housingFees??0)+(plan.budget.moving||0)+(plan.budget.temporaryAccommodation||0)};
     function expense(key,label,max){
@@ -41,8 +41,7 @@ export const planEditorRenderer = String.raw`
     expense('monthlyRent','Monthly rent assumption',6000);
     const depositLabel=element('label','','check'),deposit=element('input');deposit.type='checkbox';deposit.checked=plan.budget.includeSecurityDeposit??true;deposit.onchange=()=>refresh();depositLabel.append(deposit,element('span',"Include security deposit equal to one month's rent"));group.append(depositLabel);
     expense('transportation','Travel and luggage',4000);
-    expense('additional','Other costs and contingency',4000);
-    group.append(element('p','Includes housing fees, moving services, temporary accommodation, supplies and contingency.','caption'));
+    expense('additional','Other costs and contingency (housing fees, moving services, temporary accommodation, supplies and contingency)',4000);
     const details=element('details');details.append(element('summary','Edit move preferences'));form.append(details);
     const preferences=element('fieldset');preferences.className='preferences';preferences.append(element('legend','Your move'));details.append(preferences);
     const fields=plan.state.fields;
