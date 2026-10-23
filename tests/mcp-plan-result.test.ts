@@ -534,6 +534,15 @@ describe("MoveFlow final result", () => {
       expect(
         tools.tools.find((t) => t.name === "generate_move_plan")?._meta?.ui,
       ).toMatchObject({ resourceUri: resultResourceUri });
+      const updateTool = tools.tools.find((t) => t.name === "update_move_plan");
+      expect(updateTool?._meta?.ui).toMatchObject({
+        resourceUri: resultResourceUri,
+        visibility: ["model", "app"],
+      });
+      expect(updateTool?._meta?.["openai/outputTemplate"]).toBe(
+        resultResourceUri,
+      );
+      expect(updateTool?._meta?.["openai/widgetAccessible"]).toBe(true);
       const resource = await client.readResource({ uri: resultResourceUri });
       expect(resource.contents[0]).toHaveProperty(
         "text",
@@ -644,6 +653,10 @@ function appHarness(hostMetadata?: Record<string, unknown>) {
     postMessage: (message: (typeof messages)[number]) => messages.push(message),
   };
   let listener: (event: unknown) => void;
+  let globalsListener: (event: unknown) => void;
+  const hostGlobals: Record<string, unknown> = {
+    toolResponseMetadata: hostMetadata,
+  };
   runInNewContext(quizHtml.match(/<script>([\s\S]*)<\/script>/)![1], {
     document: {
       getElementById: (id: string) => (id === "app" ? root : connectionStatus),
@@ -663,9 +676,10 @@ function appHarness(hostMetadata?: Record<string, unknown>) {
       observe() {}
     },
     window: {
-      openai: { toolResponseMetadata: hostMetadata },
+      openai: hostGlobals,
       addEventListener: (type: string, handler: typeof listener) => {
         if (type === "message") listener = handler;
+        if (type === "openai:set_globals") globalsListener = handler;
       },
     },
   });
@@ -676,6 +690,10 @@ function appHarness(hostMetadata?: Record<string, unknown>) {
     connectionStatus,
     messages,
     send,
+    setGlobals: (globals: Record<string, unknown>) => {
+      Object.assign(hostGlobals, globals);
+      globalsListener?.({ detail: { globals } });
+    },
     resize: (nextHeight: number) => {
       height = nextHeight;
       resizeObserver();
@@ -684,6 +702,79 @@ function appHarness(hostMetadata?: Record<string, unknown>) {
 }
 
 describe("shipped app bridge", () => {
+  it("renders plan updates delivered through compatibility host globals", async () => {
+    const { payload } = await resultFixture();
+    const compact = presentPlan(payload.structuredContent, "widget", {});
+    const app = appHarness();
+    app.setGlobals({
+      toolOutput: compact.structuredContent,
+      toolResponseMetadata: { call_tool_result: compact },
+    });
+    expect(app.root.text).toContain("Homes to compare");
+    app.setGlobals({ theme: "dark" });
+    const latest = {
+      ...payload.structuredContent,
+      generatedAt: "2099-01-01T00:00:00.000Z",
+      move: { ...payload.structuredContent.move, maxRent: 1800 },
+      state: { ...state, fields: { ...state.fields, maxRent: 1800 } },
+      housing: {
+        ...payload.structuredContent.housing,
+        totalMatches: 0,
+        options: [],
+      },
+    };
+    const updated = presentPlan(latest, "widget", {});
+    app.setGlobals({
+      toolOutput: updated.structuredContent,
+      toolResponseMetadata: { mcp_tool_result: updated },
+    });
+    expect(app.root.text).toContain("$1,800/month maximum");
+    expect(app.root.text).not.toContain("Home match");
+    expect(app.root.querySelector("#preference-maxRent")!.value).toBe("1800");
+  });
+  it.each(["older", "duplicate"])(
+    "keeps the latest plan and draft edits when the host replays an %s result",
+    async (replay) => {
+      const { result } = await resultFixture();
+      const previous = buildPlanPresentation(result, state);
+      previous.generatedAt = "2026-10-23T06:00:00.000Z";
+      const latestState = {
+        ...state,
+        fields: { ...state.fields, maxRent: 1800 },
+      };
+      const latest = buildPlanPresentation(
+        { ...result, input: completeIntake(latestState), housing: [] },
+        latestState,
+      );
+      latest.generatedAt = "2026-10-23T06:01:00.000Z";
+      const app = appHarness();
+      app.send({
+        jsonrpc: "2.0",
+        method: "ui/notifications/tool-result",
+        params: presentPlan(previous, "widget", {}),
+      });
+      app.send({
+        jsonrpc: "2.0",
+        method: "ui/notifications/tool-result",
+        params: presentPlan(latest, "widget", {}),
+      });
+      const editor = app.root.querySelector("#preference-maxRent")!;
+      editor.value = "1600";
+      app.send({
+        jsonrpc: "2.0",
+        method: "ui/notifications/tool-result",
+        params: presentPlan(
+          replay === "older" ? previous : latest,
+          "widget",
+          {},
+        ),
+      });
+      expect(app.root.querySelector("#preference-maxRent")).toBe(editor);
+      expect(editor.value).toBe("1600");
+      expect(app.root.text).toContain("$1,800/month maximum");
+      expect(app.root.text).not.toContain("Home match");
+    },
+  );
   it.each(["call_tool_result", "mcp_tool_result"])(
     "reads widget data from the host's %s envelope",
     (key) => {
@@ -1029,9 +1120,13 @@ describe("shipped app bridge", () => {
       app.messages.some((message) => message.method === "tools/call"),
     ).toBe(false);
   });
-  it.each(["slider", "amount"])(
-    "refreshes housing and its map when the monthly rent %s changes",
-    async (control) => {
+  it.each(
+    ["slider", "amount"].flatMap((control) =>
+      ["widget", "legacy"].map((mode) => ({ control, mode })),
+    ),
+  )(
+    "refreshes housing and its map when the monthly rent $control changes in $mode mode",
+    async ({ control, mode }) => {
       vi.stubEnv("MAPBOX_ACCESS_TOKEN", "secret-test-token");
       vi.stubEnv("NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN", "");
       vi.mocked(searchHousing).mockResolvedValue({
@@ -1066,7 +1161,10 @@ describe("shipped app bridge", () => {
         const app = appHarness();
         const initial = await client.callTool({
           name: "generate_move_plan",
-          arguments: { state },
+          arguments: {
+            state,
+            ...(mode === "widget" ? { interactionMode: "widget" } : {}),
+          },
         });
         app.send({
           jsonrpc: "2.0",

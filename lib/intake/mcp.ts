@@ -142,12 +142,14 @@ async function output(work: () => Promise<unknown>, text?: string) {
 export function registerIntakeTools(server: McpServer) {
   const quizUris = [
     quizResourceUri,
+    "ui://moveflow/quiz-v7.html",
     "ui://moveflow/quiz-v6.html",
     "ui://moveflow/quiz-v5.html",
     "ui://moveflow/quiz-v4.html",
   ];
   const planUris = [
     resultResourceUri,
+    "ui://moveflow/plan-v6.html",
     "ui://moveflow/plan-v5.html",
     "ui://moveflow/plan-v4.html",
     "ui://moveflow/plan-v3.html",
@@ -239,7 +241,10 @@ export function registerIntakeTools(server: McpServer) {
     {
       description:
         "Restore the complete MoveFlow widget from its latest caller-owned state when host rendering metadata is unavailable. Returns the current intake question, or rebuilds the ready plan through the existing planner. Does not change answers or persist anything.",
-      _meta: { ui: { visibility: ["app"] } },
+      _meta: {
+        ui: { visibility: ["app"] },
+        "openai/widgetAccessible": true,
+      },
       inputSchema: z.object({ state: intakeStateSchema }),
       annotations,
     },
@@ -322,7 +327,11 @@ export function registerIntakeTools(server: McpServer) {
     {
       description:
         "Apply the user's explicit expense or preference edits to the latest caller-owned state and regenerate the relocation plan, including housing searches, budget, readiness and timeline. Use interactionMode widget for updates in the app; conversation is an explicit chat fallback. Omitting the mode preserves the full legacy response. Pass only changed preferences in changes. Estimates are editable planning allowances, not quotes. User edits take precedence over GPT defaults. Returns the latest state in structuredContent.state for subsequent updates. Does not persist or book anything.",
-      _meta: { ui: { visibility: ["model", "app"] } },
+      _meta: {
+        ui: { resourceUri: resultResourceUri, visibility: ["model", "app"] },
+        "openai/outputTemplate": resultResourceUri,
+        "openai/widgetAccessible": true,
+      },
       inputSchema: z.object({
         state: intakeStateSchema,
         interactionMode: interactionModeSchema.optional(),

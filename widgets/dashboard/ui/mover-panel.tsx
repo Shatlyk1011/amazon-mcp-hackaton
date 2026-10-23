@@ -87,13 +87,7 @@ export function MoverPanel({
                   {item.distanceMiles} miles from your starting city
                 </div>
               ) : null}
-              <button
-                type="button"
-                onClick={() => onSelect(item.id)}
-                className="mt-4 min-h-11 w-full rounded-md bg-[#171717] px-3 py-2 text-xs font-medium text-white hover:bg-[#171717]/85"
-              >
-                {selected === item.id ? "Selected" : "Select service"}
-              </button>
+
               <div className="mt-3 flex flex-wrap gap-3 text-xs font-medium text-[#0761d1]">
                 {item.phone ? (
                   <a href={`tel:${item.phone}`}>

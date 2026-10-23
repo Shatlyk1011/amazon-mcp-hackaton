@@ -312,7 +312,7 @@ export function PlanWorkspace({
     <Dialog open={isRefinementOpen} onOpenChange={setRefinementOpen}>
       <DialogTrigger
         render={
-          <Button size="lg" className="rounded-full px-5 shadow-lg">
+          <Button size="lg" >
             <Sparkles data-icon="inline-start" />
             Change this plan
           </Button>

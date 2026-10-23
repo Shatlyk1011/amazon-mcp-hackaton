@@ -1,8 +1,8 @@
 import { resultRenderer, resultStyles } from "./result-app";
 import { planEditorRenderer, planEditorStyles } from "./plan-editor";
 
-export const quizResourceUri = "ui://moveflow/quiz-v7.html";
-export const resultResourceUri = "ui://moveflow/plan-v6.html";
+export const quizResourceUri = "ui://moveflow/quiz-v8.html";
+export const resultResourceUri = "ui://moveflow/plan-v7.html";
 
 // A self-contained resource lets MCP Apps hosts render it without fetching assets.
 export const quizHtml = String.raw`<!doctype html>
@@ -24,6 +24,7 @@ ${planEditorStyles}
   const pending = new Map();
   const viewLoads = new Map();
   let resultRevision = 0;
+  let renderedPlan, renderedPlanSignature;
   const notify = (method, params) => parent.postMessage({jsonrpc:'2.0',method,params}, '*');
   const request = (method, params) => new Promise((resolve,reject) => {
     const id = ++nextId;
@@ -89,15 +90,23 @@ ${resultRenderer}
     syncContext({status:'plan_ready',state:plan.state,move:plan.move,budget:plan.budget,housing:plan.housing,nextAction:plan.readiness?.nextAction,instruction:'The MoveFlow widget has completed the intake and displays the plan. Do not restart the quiz or repeat its questions. Answer follow-ups using these confirmed details.'});
   }
   async function update(result, allowRecovery=true) {
-    const revision=allowRecovery?++resultRevision:resultRevision;
     if(result && result.isError) { const error=new Error(result.content?.[0]?.text || 'Could not save your answer.'); error.toolMessage=true; throw error; }
     const data=readResult(result);
+    // Hosts can replay the original tool result after a widget-initiated edit.
+    // Ignore it before advancing the revision so it cannot cancel a newer load.
+    if(data?.status==='ready'&&renderedPlan){
+      const incoming=Date.parse(data.generatedAt),current=Date.parse(renderedPlan.generatedAt);
+      if(Number.isFinite(incoming)&&Number.isFinite(current)&&incoming<current)return renderedPlan;
+      if(data.readiness&&JSON.stringify(data)===renderedPlanSignature)return renderedPlan;
+    }
+    const revision=allowRecovery?++resultRevision:resultRevision;
     if(data?.interaction?.mode==='conversation'){
       disposeMaps();root.replaceChildren(element('h1','Continuing in chat'),element('p','Answer the questions in the conversation. MoveFlow will use those answers to build your plan.'));resize();return;
     }
     if(data?.status==='ready'&&data.readiness){
       const plan=data;
       renderPlan(plan,resultEnvelope(result)?._meta?.moveflow);
+      renderedPlan=plan;renderedPlanSignature=JSON.stringify(plan);
       syncPlan(plan);
       return plan;
     }
@@ -199,6 +208,15 @@ ${resultRenderer}
     if(typeof m.id==='number'&&pending.has(m.id)){const p=pending.get(m.id);clearTimeout(p.timer);pending.delete(m.id);m.error?p.reject(m.error):p.resolve(m.result);return;}
     if(m.method==='ui/notifications/tool-result')void update(m.params).catch(e=>showError(e.message));
   });
-  request('ui/initialize',{appInfo:{name:'MoveFlow',version:'2.1.1'},appCapabilities:{},protocolVersion:'2026-01-26'}).then(()=>notify('ui/notifications/initialized',{})).catch(()=>showError('The quiz could not connect. Continue in the conversation.'));
+  // Compatibility hosts can publish results through globals instead of JSON-RPC.
+  function updateHostGlobals(globals){
+    if(globals?.toolOutput===undefined&&globals?.toolResponseMetadata===undefined)return;
+    const data=globals.toolOutput??window.openai?.toolOutput;
+    const metadata=globals.toolResponseMetadata??window.openai?.toolResponseMetadata;
+    if(!data&&!metadata)return;
+    void update({structuredContent:data,call_tool_result:metadata?.call_tool_result??metadata,mcp_tool_result:metadata?.mcp_tool_result}).catch(e=>showError(e.message));
+  }
+  window.addEventListener('openai:set_globals',event=>updateHostGlobals(event.detail?.globals));
+  request('ui/initialize',{appInfo:{name:'MoveFlow',version:'2.1.2'},appCapabilities:{},protocolVersion:'2026-01-26'}).then(()=>{notify('ui/notifications/initialized',{});if(window.openai?.toolOutput)updateHostGlobals(window.openai)}).catch(()=>showError('The quiz could not connect. Continue in the conversation.'));
 })();
 </script></body></html>`;
