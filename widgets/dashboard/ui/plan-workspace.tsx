@@ -210,7 +210,6 @@ export function PlanWorkspace({
                     origin: form.get("origin"),
                     destination: form.get("destination"),
                     movingDate: form.get("movingDate"),
-                    budget: Number(form.get("budget")),
                     maxRent: Number(form.get("maxRent")),
                     minBedrooms: Number(form.get("minBedrooms")),
                   },
@@ -225,11 +224,6 @@ export function PlanWorkspace({
                   { name: "origin", label: "Moving from", type: "text" },
                   { name: "destination", label: "Moving to", type: "text" },
                   { name: "movingDate", label: "Moving date", type: "date" },
-                  {
-                    name: "budget",
-                    label: "Total moving budget ($)",
-                    type: "number",
-                  },
                   {
                     name: "maxRent",
                     label: "Monthly rent limit ($)",

@@ -34,9 +34,15 @@ export const planEditorRenderer = String.raw`
       const wrap=element('div','','control'),heading=element('div','','control-heading'),title=element('label',label),input=element('input'),slider=element('input');
       input.type='number';input.id='cost-'+key;input.className='entry amount';input.min='0';input.max='1000000';input.step='any';input.value=String(defaults[key]);input.required=true;title.htmlFor=input.id;
       slider.type='range';slider.min='0';slider.max=String(Math.max(max,defaults[key]*2));slider.step='1';slider.value=input.value;slider.setAttribute('aria-label',label+' slider');
-      input.oninput=()=>{slider.max=String(Math.max(Number(slider.max),Number(input.value)||0));slider.value=input.value;refresh();};
-      slider.oninput=()=>{input.value=slider.value;refresh();};
+      const changed=()=>{
+        // Apply the chosen rent to the search as well as the expense estimate.
+        if(key==='monthlyRent')controls.maxRent.value=input.value;
+        refresh();
+      };
+      input.oninput=()=>{slider.max=String(Math.max(Number(slider.max),Number(input.value)||0));slider.value=input.value;changed();};
+      slider.oninput=()=>{input.value=slider.value;changed();};
       heading.append(title,input);wrap.append(heading,slider);group.append(wrap);expenses[key]=input;sliders[key]=slider;
+      if(key==='monthlyRent')wrap.append(element('p','Changing rent also updates the rental search limit. Select Update plan to refresh homes and the map. You can set a different limit in Edit move details.','caption'));
     }
     expense('monthlyRent','Estimated monthly rent',6000);
     const depositLabel=element('label','','check'),deposit=element('input');deposit.type='checkbox';deposit.checked=plan.budget.includeSecurityDeposit??true;deposit.onchange=()=>refresh();depositLabel.append(deposit,element('span',"Include security deposit equal to one month's rent"));group.append(depositLabel);

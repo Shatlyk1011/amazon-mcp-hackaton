@@ -113,7 +113,7 @@ MCP hosts can pass relevant facts the user previously shared (for example, adult
 
 `prepare_move_intake` advertises `ui://moveflow/quiz-v4.html`; `generate_move_plan` advertises `ui://moveflow/plan-v3.html`. The quiz calls the intake and plan tools directly. The plan widget calls `update_move_plan` and synchronizes context when supported.
 
-A successful `generate_move_plan` puts the presentation directly in `structuredContent` (`status`, `state`, `move`, `route`, `housing`, `movers`, `flights`, `budget`, `strategies`, `timeline`, `readiness`, `briefing`, and `assumptions`), not in `structuredContent.result`. `content[0].text` is readable text. Map rendering data is delivered in `_meta.moveflow.map` and `_meta.moveflow.housingMap`. Retain the returned `state`, including `expenseEstimates`, for subsequent updates. `maxRent` filters rentals independently of assumed monthly rent.
+A successful `generate_move_plan` puts the presentation directly in `structuredContent` (`status`, `state`, `move`, `route`, `housing`, `movers`, `flights`, `budget`, `strategies`, `timeline`, `readiness`, `briefing`, and `assumptions`), not in `structuredContent.result`. `content[0].text` is readable text. Map rendering data is delivered in `_meta.moveflow.map` and `_meta.moveflow.housingMap`. Retain the returned `state`, including `expenseEstimates`, for subsequent updates. `maxRent` filters rentals independently of assumed monthly rent at the API level. In the widget, editing the monthly rent amount or slider sets both the estimate and rental search limit; users can then override the search limit in **Edit move details** before selecting **Update plan**.
 
 ## Architecture and data
 
@@ -140,7 +140,7 @@ For live verification after configuration: submit a form, note the URL, reload, 
 
 ## Hackathon submission
 
-This project enters the Alexa+ track as a self-hosted MCP server. Development began on October 12, 2026; the relocation planner, MCP tools, provider integrations, persistent plans, and assistant were added subsequently. 
+This project enters the Alexa+ track as a self-hosted MCP server. Development began on October 12, 2026; the relocation planner, MCP tools, provider integrations, persistent plans, and assistant were added subsequently.
 
 ## License
 

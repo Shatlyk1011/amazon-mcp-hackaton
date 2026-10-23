@@ -532,7 +532,9 @@ class TestNode {
           ? n.className.split(" ").includes(selector.slice(1))
           : selector.startsWith("#")
             ? n.id === selector.slice(1)
-            : n.tag === selector,
+            : selector === "input[type=range]"
+              ? n.tag === "input" && n.type === "range"
+              : n.tag === selector,
       ) ??
       this.children.map((n) => n.querySelector(selector)).find(Boolean) ??
       null
@@ -593,6 +595,122 @@ function appHarness() {
 }
 
 describe("shipped app bridge", () => {
+  it.each(["slider", "amount"])(
+    "refreshes housing and its map when the monthly rent %s changes",
+    async (control) => {
+      vi.stubEnv("MAPBOX_ACCESS_TOKEN", "secret-test-token");
+      vi.stubEnv("NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN", "");
+      vi.mocked(searchHousing).mockResolvedValue({
+        listings: [home("affordable", 1500), home("higher-rent", 2800)],
+        status: "live",
+        source: "RentCast",
+        fetchedAt,
+        browseUrl: "https://www.zillow.com/",
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async (url: string) =>
+            new Response(new Uint8Array([url.includes("pin-s-2") ? 2 : 1]), {
+              headers: { "content-type": "image/png" },
+            }),
+        ),
+      );
+      const client = new Client({ name: "housing-slider-test", version: "1" });
+      await client.connect(
+        new StreamableHTTPClientTransport(new URL("http://localhost/api/mcp"), {
+          fetch: async (url, init) => POST(new Request(url, init)),
+        }),
+      );
+      try {
+        const app = appHarness();
+        const initial = await client.callTool({
+          name: "generate_move_plan",
+          arguments: { state },
+        });
+        app.send({
+          jsonrpc: "2.0",
+          method: "ui/notifications/tool-result",
+          params: initial,
+        });
+        expect(app.root.text).toContain("Home higher-rent");
+        const housingSection = () =>
+          app.root.children[0].children.find(
+            (node) => node.children[0]?.textContent === "Homes to compare",
+          )!;
+        const initialMap = housingSection().querySelector(".map")!;
+        expect(initialMap).not.toBeNull();
+        const amount = app.root.querySelector("#cost-monthlyRent")!;
+        const rentControl =
+          control === "slider"
+            ? app.root.querySelector("input[type=range]")!
+            : amount;
+        rentControl.value = "1800";
+        rentControl.oninput!();
+        expect(amount.value).toBe("1800");
+        expect(app.root.querySelector("#preference-maxRent")!.value).toBe(
+          "1800",
+        );
+        const submitting = app.root.querySelector("form")!.onsubmit!({
+          preventDefault() {},
+        });
+        const call = app.messages.find((m) => m.method === "tools/call")!;
+        expect(call.params).toMatchObject({
+          name: "update_move_plan",
+          arguments: {
+            changes: { maxRent: 1800 },
+            estimates: { monthlyRent: 1800 },
+          },
+        });
+        const updated = await client.callTool(
+          call.params as Parameters<typeof client.callTool>[0],
+        );
+        app.send({ jsonrpc: "2.0", id: call.id, result: updated });
+        await submitting;
+        expect(searchHousing).toHaveBeenLastCalledWith(
+          expect.objectContaining({ maxRent: 1800 }),
+        );
+        expect(app.root.text).toContain("Home affordable");
+        expect(app.root.text).not.toContain("Home higher-rent");
+        const updatedMap = housingSection().querySelector(".map")!;
+        expect(updatedMap).not.toBe(initialMap);
+        expect(updatedMap).toHaveProperty("src", "data:image/png;base64,AQ==");
+        expect(JSON.stringify(initial._meta)).toContain(
+          "data:image/png;base64,Ag==",
+        );
+
+        // A subsequent update uses the latest state and clears the old map
+        // entirely when the new limit excludes every rental.
+        const lowerRent = app.root.querySelector("#cost-monthlyRent")!;
+        lowerRent.value = "1000";
+        lowerRent.oninput!();
+        const resubmitting = app.root.querySelector("form")!.onsubmit!({
+          preventDefault() {},
+        });
+        const nextCall = app.messages
+          .filter((m) => m.method === "tools/call")
+          .at(-1)!;
+        expect(nextCall.params).toMatchObject({
+          arguments: {
+            state: { fields: { maxRent: 1800 } },
+            changes: { maxRent: 1000 },
+          },
+        });
+        const empty = await client.callTool(
+          nextCall.params as Parameters<typeof client.callTool>[0],
+        );
+        app.send({ jsonrpc: "2.0", id: nextCall.id, result: empty });
+        await resubmitting;
+        expect(housingSection().querySelector(".map")).toBeNull();
+        expect(housingSection().text).toContain(
+          "No rentals match your choices",
+        );
+        expect(housingSection().text).not.toContain("Home affordable");
+      } finally {
+        await client.close();
+      }
+    },
+  );
   it("preserves custom household counts and selects the saved radio preferences", async () => {
     const { payload } = await resultFixture();
     const plan = payload.structuredContent;
