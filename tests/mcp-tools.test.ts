@@ -380,11 +380,11 @@ describe("public MCP standalone contracts", () => {
         (tool) => tool.name === "prepare_move_intake",
       );
       expect(prepare?._meta?.ui).toEqual({
-        resourceUri: "ui://moveflow/quiz-v6.html",
+        resourceUri: "ui://moveflow/quiz-v7.html",
       });
       expect(prepare?.description).toContain("do not repeat its questions");
       const resource = await client.readResource({
-        uri: "ui://moveflow/quiz-v6.html",
+        uri: "ui://moveflow/quiz-v7.html",
       });
       expect(resource.contents[0]).toMatchObject({
         mimeType: "text/html;profile=mcp-app",
@@ -414,13 +414,15 @@ describe("public MCP standalone contracts", () => {
         "destination",
       );
       expect(prepare?._meta?.["openai/outputTemplate"]).toBe(
-        "ui://moveflow/quiz-v6.html",
+        "ui://moveflow/quiz-v7.html",
       );
       const recovery = tools.tools.find(
         (tool) => tool.name === "get_moveflow_view",
       );
       expect(recovery?._meta?.ui).toEqual({ visibility: ["app"] });
       for (const uri of [
+        "ui://moveflow/quiz-v6.html",
+        "ui://moveflow/plan-v5.html",
         "ui://moveflow/quiz-v5.html",
         "ui://moveflow/quiz-v4.html",
         "ui://moveflow/plan-v4.html",

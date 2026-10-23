@@ -119,20 +119,59 @@ export async function buildHousingMap(result: PlanResult) {
   };
   const token = process.env.MAPBOX_ACCESS_TOKEN;
   if (!token) return fallback;
-  const pins = homes.flatMap((home, index) =>
+  const locations = homes.flatMap((home, index) =>
     Number.isFinite(home.lng) &&
     Number.isFinite(home.lat) &&
     Math.abs(home.lng) <= 180 &&
     Math.abs(home.lat) <= 85
-      ? [
-          `pin-s-${index + 1}+286aa8(${home.lng.toFixed(5)},${home.lat.toFixed(5)})`,
-        ]
+      ? [{ index, lng: home.lng, lat: home.lat }]
       : [],
   );
-  if (!pins.length) return fallback;
+  if (!locations.length) return fallback;
+  // Use the same explicit Mercator viewport for the image and its HTML buttons.
+  // Provider-rendered markers in an auto-fitted image cannot receive clicks.
+  const project = (lng: number, lat: number) => ({
+    x: (lng + 180) / 360,
+    y: (1 - Math.asinh(Math.tan((lat * Math.PI) / 180)) / Math.PI) / 2,
+  });
+  const points = locations.map(({ lng, lat }) => project(lng, lat));
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const lng = Number((cx * 360 - 180).toFixed(6));
+  const lat = Number(
+    ((Math.atan(Math.sinh(Math.PI * (1 - 2 * cy))) * 180) / Math.PI).toFixed(6),
+  );
+  const width = 900,
+    height = 400,
+    padding = 70;
+  const zoom =
+    Math.floor(
+      Math.max(
+        0,
+        Math.min(
+          14,
+          Math.log2(
+            (width - 2 * padding) / (512 * (Math.max(...xs) - Math.min(...xs))),
+          ),
+          Math.log2(
+            (height - 2 * padding) /
+              (512 * (Math.max(...ys) - Math.min(...ys))),
+          ),
+        ),
+      ) * 100,
+    ) / 100;
+  const center = project(lng, lat);
+  const worldSize = 512 * 2 ** zoom;
+  const pins = points.map((point, i) => ({
+    index: locations[i].index,
+    x: 0.5 + ((point.x - center.x) * worldSize) / width,
+    y: 0.5 + ((point.y - center.y) * worldSize) / height,
+  }));
   try {
     const response = await fetch(
-      `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${pins.join(",")}/auto/900x400?padding=70&access_token=${encodeURIComponent(token)}`,
+      `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${lng},${lat},${zoom}/${width}x${height}?access_token=${encodeURIComponent(token)}`,
       { cache: "no-store", signal: AbortSignal.timeout(4_000) },
     );
     if (
@@ -146,6 +185,7 @@ export async function buildHousingMap(result: PlanResult) {
     return {
       status: "map",
       image: `data:image/png;base64,${Buffer.from(bytes).toString("base64")}`,
+      pins,
       caption: "Numbers match the homes below · © Mapbox © OpenStreetMap",
     };
   } catch {

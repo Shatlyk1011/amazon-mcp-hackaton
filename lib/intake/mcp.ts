@@ -142,11 +142,13 @@ async function output(work: () => Promise<unknown>, text?: string) {
 export function registerIntakeTools(server: McpServer) {
   const quizUris = [
     quizResourceUri,
+    "ui://moveflow/quiz-v6.html",
     "ui://moveflow/quiz-v5.html",
     "ui://moveflow/quiz-v4.html",
   ];
   const planUris = [
     resultResourceUri,
+    "ui://moveflow/plan-v5.html",
     "ui://moveflow/plan-v4.html",
     "ui://moveflow/plan-v3.html",
   ];

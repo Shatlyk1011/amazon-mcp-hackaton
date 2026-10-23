@@ -449,8 +449,10 @@ describe("MoveFlow final result", () => {
     expect(fetch.mock.calls[0][0].length).toBeLessThan(8_192);
     const housingMap = await buildHousingMap(result);
     expect(housingMap?.status).toBe("map");
-    expect(fetch.mock.calls[1][0]).toContain("pin-s-1");
-    expect(fetch.mock.calls[1][0]).not.toContain("pin-s-2");
+    expect(housingMap).toMatchObject({
+      pins: [{ index: 0, x: expect.closeTo(0.5), y: expect.closeTo(0.5) }],
+    });
+    expect(JSON.stringify(housingMap)).not.toContain("secret-test-token");
     fetch.mockRejectedValue(new Error("offline"));
     const fallback = await buildPlanMap(result);
     expect(fallback.status).toBe("diagram");
@@ -458,6 +460,67 @@ describe("MoveFlow final result", () => {
       200,
     );
     expect((await buildHousingMap(result))?.status).toBe("unavailable");
+  });
+  it("positions selectable homes inside the static map and preserves their table numbers", async () => {
+    const { result } = await resultFixture();
+    vi.stubEnv("MAPBOX_ACCESS_TOKEN", "secret-test-token");
+    vi.stubEnv("NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN", "");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(new Uint8Array([1]), {
+            headers: { "content-type": "image/png" },
+          }),
+      ),
+    );
+    const rentals = {
+      ...result,
+      housing: [
+        { ...home("missing-location"), lng: NaN },
+        { ...home("south", 1500), lng: -74, lat: 40.7 },
+        { ...home("north", 2700), lng: -73.9, lat: 40.8 },
+      ],
+    };
+    const map = await buildHousingMap(rentals);
+    if (!map || !("pins" in map)) throw new Error("Expected a rental map");
+    expect(map.pins.map((pin) => pin.index)).toEqual([1, 2]);
+    for (const pin of map.pins) {
+      expect(pin.x).toBeGreaterThanOrEqual(70 / 900 - 0.001);
+      expect(pin.x).toBeLessThanOrEqual(830 / 900 + 0.001);
+      expect(pin.y).toBeGreaterThanOrEqual(70 / 400 - 0.001);
+      expect(pin.y).toBeLessThanOrEqual(330 / 400 + 0.001);
+    }
+    expect(map.pins[0].x).toBeLessThan(map.pins[1].x);
+    expect(map.pins[0].y).toBeGreaterThan(map.pins[1].y);
+    const app = appHarness();
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: {
+        structuredContent: buildPlanPresentation(rentals, state),
+        _meta: { moveflow: { housingMap: map } },
+      },
+    });
+    const host = app.root.querySelector(".static-rental-map")!;
+    const pins = host.children.filter((node) => node.className === "map-pin");
+    const details = app.root.querySelector(".map-selection")!;
+    expect(pins.map((pin) => pin.text)).toEqual(["2", "3"]);
+    await pins[0].onclick!();
+    expect(details.text).toContain("Home south");
+    expect(details.text).toContain("south Example Street");
+    expect(details.text).toContain("$1,500/month · 2 beds · 1 bath");
+    expect(details.text).toContain("Listed as available");
+    expect(details.querySelector("a")).toHaveProperty(
+      "href",
+      "https://www.zillow.com/homes/south",
+    );
+    await pins[1].onclick!();
+    expect(details.text).toContain("Home north");
+    expect(details.text).not.toContain("Home south");
+    expect(pins[0].attributes["aria-pressed"]).toBe("false");
+    expect(pins[1].attributes["aria-pressed"]).toBe("true");
+    expect(app.messages.some((m) => m.method === "tools/call")).toBe(false);
   });
   it("registers direct result UI and returns model text separately from widget data with no extra LLM", async () => {
     const client = new Client({ name: "result-test", version: "1" });
@@ -529,6 +592,7 @@ class TestNode {
   id = "";
   type = "";
   hidden = false;
+  style: Record<string, string> = {};
   oninput?: () => void;
   onchange?: () => void;
   onclick?: () => Promise<void>;
@@ -944,7 +1008,7 @@ describe("shipped app bridge", () => {
     expect(app.root.text).toContain("Boston, MA");
     expect(app.root.text).toContain("Try again");
   });
-  it("keeps the next step prominent and opens the editor without rebuilding the plan", async () => {
+  it("keeps the next step and inline budget editor without header action buttons", async () => {
     const { payload } = await resultFixture();
     const app = appHarness();
     app.send({
@@ -957,9 +1021,10 @@ describe("shipped app bridge", () => {
     );
     const editor = app.root.querySelector(".editor-details")!;
     expect(editor).not.toHaveProperty("open", true);
-    await app.root.querySelector(".plan-actions")!.querySelector("button")!
-      .onclick!();
-    expect(editor).toHaveProperty("open", true);
+    expect(editor.querySelector("#cost-monthlyRent")).not.toBeNull();
+    expect(app.root.querySelector(".plan-actions")).toBeNull();
+    expect(app.root.text).not.toContain("Edit plan");
+    expect(app.root.text).not.toContain("Expand plan");
     expect(
       app.messages.some((message) => message.method === "tools/call"),
     ).toBe(false);
@@ -979,10 +1044,16 @@ describe("shipped app bridge", () => {
       vi.stubGlobal(
         "fetch",
         vi.fn(
-          async (url: string) =>
-            new Response(new Uint8Array([url.includes("pin-s-2") ? 2 : 1]), {
-              headers: { "content-type": "image/png" },
-            }),
+          async () =>
+            new Response(
+              new Uint8Array([
+                (vi.mocked(searchHousing).mock.lastCall![0].maxRent ?? 3800) >=
+                2800
+                  ? 2
+                  : 1,
+              ]),
+              { headers: { "content-type": "image/png" } },
+            ),
         ),
       );
       const client = new Client({ name: "housing-slider-test", version: "1" });
@@ -1009,6 +1080,10 @@ describe("shipped app bridge", () => {
           )!;
         const initialMap = housingSection().querySelector(".map")!;
         expect(initialMap).not.toBeNull();
+        await housingSection().querySelector(".map-pin")!.onclick!();
+        expect(
+          housingSection().querySelector(".map-selection")!.text,
+        ).toContain("Home affordable");
         const amount = app.root.querySelector("#cost-monthlyRent")!;
         const rentControl =
           control === "slider"
@@ -1043,6 +1118,13 @@ describe("shipped app bridge", () => {
         expect(app.root.text).not.toContain("Home higher-rent");
         const updatedMap = housingSection().querySelector(".map")!;
         expect(updatedMap).not.toBe(initialMap);
+        expect(housingSection().querySelector(".map-selection")!.text).toBe(
+          "Select a numbered marker to see its home.",
+        );
+        await housingSection().querySelector(".map-pin")!.onclick!();
+        expect(
+          housingSection().querySelector(".map-selection")!.text,
+        ).toContain("$1,500/month");
         expect(updatedMap).toHaveProperty("src", "data:image/png;base64,AQ==");
         expect(JSON.stringify(initial._meta)).toContain(
           "data:image/png;base64,Ag==",
