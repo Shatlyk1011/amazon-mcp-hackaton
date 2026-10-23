@@ -39,21 +39,31 @@ ${planEditorStyles}
   function showError(message) { let el=root.querySelector('.error'); if(!el){el=element('p','','error');el.setAttribute('role','alert');root.append(el)} el.textContent=message; resize(); }
 ${planEditorRenderer}
 ${resultRenderer}
-  function update(result) {
+  function syncContext(data) {
+    request('ui/update-model-context',{content:[{type:'text',text:JSON.stringify(data)}]}).catch(()=>{});
+  }
+  function update(result, fromWidget = false) {
     if(result && result.isError) { const error=new Error(result.content?.[0]?.text || 'Could not save your answer.'); error.toolMessage=true; throw error; }
-    if(result?.structuredContent?.status==='ready'){renderPlan(result.structuredContent,result._meta?.moveflow);return;}
+    if(result?.structuredContent?.status==='ready'){
+      const plan=result.structuredContent;
+      renderPlan(plan,result._meta?.moveflow);
+      if(fromWidget)syncContext({status:'plan_ready',state:plan.state,move:plan.move,budget:plan.budget,nextAction:plan.readiness?.nextAction,instruction:'The MoveFlow widget has completed the intake and displays the plan. Do not restart the quiz or repeat its questions.'});
+      return;
+    }
     if(!result?.structuredContent?.state) throw new Error('The quiz response was incomplete.');
     view=result.structuredContent; buildError=undefined; render();
+    if(fromWidget)syncContext({status:view.ready?'building_plan':'intake_in_progress',state:view.state,instruction:'The MoveFlow widget handles the intake. Do not ask its questions in chat or start a second quiz.'});
     if(view.ready) void buildPlan();
   }
   async function buildPlan() {
     if(building)return;
     building=true; buildError=undefined; render();
     try {
-      update(await request('tools/call',{name:'generate_move_plan',arguments:{state:view.state}}));
+      update(await request('tools/call',{name:'generate_move_plan',arguments:{state:view.state}}),true);
     } catch(e) {
       buildError=e?.toolMessage ? e.message : 'The plan could not be built. Your answers are still here; please try again.';
       render();
+      syncContext({status:'plan_build_failed',state:view.state,instruction:'The MoveFlow widget retains the answers and offers a retry. Do not restart the quiz.'});
     } finally { building=false; }
   }
   function render() {
@@ -83,7 +93,7 @@ ${resultRenderer}
     group.addEventListener('change',()=>{input.value=''});
     form.onsubmit=async event=>{event.preventDefault();if(busy)return;const choice=form.querySelector('input[name=choice]:checked');const text=input.value.trim();if(!choice&&!text){showError('Choose an option or enter an answer.');return;}
       busy=true;button.disabled=true;button.textContent='Saving…';root.querySelector('.error')?.remove();
-      try { const response=await request('tools/call',{name:'answer_move_intake',arguments:{state:view.state,answer:{questionId:q.id,...(choice?{choice:choice.value}:{text})}}}); update(response); }
+      try { const response=await request('tools/call',{name:'answer_move_intake',arguments:{state:view.state,answer:{questionId:q.id,...(choice?{choice:choice.value}:{text})}}}); update(response,true); }
       catch(e){showError(e?.message || 'Could not save your answer. Try again.');button.disabled=false;button.textContent='Continue';} finally{busy=false;}
     };
     resize();

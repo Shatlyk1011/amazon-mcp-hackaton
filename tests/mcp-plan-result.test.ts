@@ -819,6 +819,11 @@ describe("shipped app bridge", () => {
     ]);
     expect(calls[1].params.arguments).toEqual({ state });
     expect(app.root.querySelector("button")).toBeNull();
+    const context = app.messages.find(
+      (message) => message.method === "ui/update-model-context",
+    )!;
+    expect(JSON.stringify(context.params)).toContain("building_plan");
+    app.send({ jsonrpc: "2.0", id: context.id, result: {} });
   });
   it("builds in the widget and renders the same result as direct tool calls", async () => {
     const { payload } = await resultFixture();
@@ -853,9 +858,12 @@ describe("shipped app bridge", () => {
     expect(app.root.text).toContain("DEMO 101");
     expect(app.root.text).toContain("Where this information comes from");
     expect(app.messages.map((m) => m.method)).not.toContain("ui/message");
-    expect(app.messages.map((m) => m.method)).not.toContain(
-      "ui/update-model-context",
-    );
+    const context = app.messages.find(
+      (message) => message.method === "ui/update-model-context",
+    )!;
+    expect(JSON.stringify(context.params)).toContain("plan_ready");
+    expect(JSON.stringify(context.params)).toContain("Do not restart the quiz");
+    app.send({ jsonrpc: "2.0", id: context.id, result: {} });
     const direct = appHarness();
     direct.send({
       jsonrpc: "2.0",
