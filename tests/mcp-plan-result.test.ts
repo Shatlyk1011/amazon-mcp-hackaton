@@ -35,6 +35,7 @@ import {
   movePlanText,
 } from "@/lib/intake/plan-result";
 import { quizHtml, resultResourceUri } from "@/lib/intake/quiz-app";
+import { presentIntake, presentPlan } from "@/lib/intake/app-output";
 
 const state = {
   ...beginIntake({ ...demoFamily, otherNeeds: "No other needs" }),
@@ -229,7 +230,10 @@ describe("MoveFlow final result", () => {
       parseEstimates.mockResolvedValue({ output_parsed: amounts });
       const initial = await client.callTool({
         name: "generate_move_plan",
-        arguments: { state: { ...state, expenseEstimates: undefined } },
+        arguments: {
+          state: { ...state, expenseEstimates: undefined },
+          interactionMode: "conversation",
+        },
       });
       const first = initial.structuredContent as ReturnType<
         typeof buildPlanPresentation
@@ -246,6 +250,7 @@ describe("MoveFlow final result", () => {
         name: "update_move_plan",
         arguments: {
           state: first.state,
+          interactionMode: "conversation",
           changes: {
             furniture: false,
             transport: "fly",
@@ -299,6 +304,7 @@ describe("MoveFlow final result", () => {
         name: "generate_move_plan",
         arguments: {
           state: next.state,
+          interactionMode: "conversation",
           estimates: { source: "model", transportation: 1 },
         },
       });
@@ -472,16 +478,25 @@ describe("MoveFlow final result", () => {
       );
       const result = await client.callTool({
         name: "generate_move_plan",
-        arguments: { state },
+        arguments: { state, interactionMode: "widget" },
       });
       expect(result.isError).not.toBe(true);
       expect(result.structuredContent).toMatchObject({ status: "ready" });
       expect(result.structuredContent).not.toHaveProperty("result");
+      expect(result.structuredContent).not.toHaveProperty("timeline");
       expect(result._meta).toHaveProperty("moveflow.map");
+      expect(result._meta).toHaveProperty("moveflow.view.timeline");
       expect((result.content as { text: string }[])[0].text).toContain(
-        "MoveFlow moving plan",
+        "Your moving plan is ready in MoveFlow",
       );
       expect(extractRelocationDetails).not.toHaveBeenCalled();
+      const legacy = await client.callTool({
+        name: "generate_move_plan",
+        arguments: { state },
+      });
+      expect(legacy.structuredContent).toHaveProperty("timeline");
+      expect(legacy.structuredContent).toHaveProperty("readiness");
+      expect(legacy.structuredContent).not.toHaveProperty("interaction");
       vi.mocked(calculateMapboxRoute).mockRejectedValueOnce(
         new Error("provider failure"),
       );
@@ -524,6 +539,7 @@ class TestNode {
     this.attributes[key] = value;
   }
   addEventListener() {}
+  focus() {}
   remove() {}
   querySelector(selector: string): TestNode | null {
     return (
@@ -546,6 +562,7 @@ class TestNode {
 }
 function appHarness() {
   const root = new TestNode();
+  const connectionStatus = new TestNode();
   let height = 600;
   let resizeObserver: () => void;
   const messages: {
@@ -559,7 +576,7 @@ function appHarness() {
   let listener: (event: unknown) => void;
   runInNewContext(quizHtml.match(/<script>([\s\S]*)<\/script>/)![1], {
     document: {
-      getElementById: () => root,
+      getElementById: (id: string) => (id === "app" ? root : connectionStatus),
       body: { getBoundingClientRect: () => ({ height }) },
       createElement: (tag: string) => new TestNode(tag),
       createElementNS: (_ns: string, tag: string) => new TestNode(tag),
@@ -585,6 +602,7 @@ function appHarness() {
   send({ jsonrpc: "2.0", id: messages[0].id, result: {} });
   return {
     root,
+    connectionStatus,
     messages,
     send,
     resize: (nextHeight: number) => {
@@ -595,6 +613,165 @@ function appHarness() {
 }
 
 describe("shipped app bridge", () => {
+  it("renders widget-only data while keeping the questionnaire out of model context", () => {
+    const intake = intakeView(beginIntake({ origin: "Boston, MA" }));
+    const payload = presentIntake(intake, "widget");
+    const app = appHarness();
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: payload,
+    });
+    expect(app.root.text).toContain(intake.nextQuestion!.title);
+    expect(app.root.text).toContain("Your confirmed details");
+    const context = app.messages.find(
+      (message) => message.method === "ui/update-model-context",
+    )!;
+    const text = JSON.stringify(context.params);
+    expect(text).toContain("intake_in_progress");
+    expect(text).toContain("Boston, MA");
+    expect(text).not.toContain("nextQuestion");
+    expect(text).not.toContain("options");
+    expect(
+      app.messages.some((message) => message.method === "ui/message"),
+    ).toBe(false);
+  });
+  it("leaves conversation fallback in chat without automatically building or syncing a widget", () => {
+    const app = appHarness();
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: presentIntake(intakeView(state), "conversation"),
+    });
+    expect(app.root.text).toContain("Continuing in chat");
+    expect(
+      app.messages.some((message) =>
+        ["tools/call", "ui/update-model-context"].includes(message.method),
+      ),
+    ).toBe(false);
+  });
+  it("shows sync failures, retains the form, and retries the latest confirmed context", async () => {
+    const { result } = await resultFixture();
+    const app = appHarness();
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: presentPlan(buildPlanPresentation(result, state), "widget", {}),
+    });
+    const form = app.root.querySelector("form");
+    const context = app.messages.find(
+      (message) => message.method === "ui/update-model-context",
+    )!;
+    app.send({
+      jsonrpc: "2.0",
+      id: context.id,
+      error: { message: "Unsupported method" },
+    });
+    await Promise.resolve();
+    expect(app.connectionStatus.hidden).toBe(false);
+    expect(app.connectionStatus.text).toContain(
+      "You can keep using this widget",
+    );
+    expect(app.root.querySelector("form")).toBe(form);
+    await app.connectionStatus.querySelector("button")!.onclick!();
+    const retry = app.messages
+      .filter((message) => message.method === "ui/update-model-context")
+      .at(-1)!;
+    expect(retry.id).not.toBe(context.id);
+    expect(retry.params).toEqual(context.params);
+    app.send({ jsonrpc: "2.0", id: retry.id, result: {} });
+    await Promise.resolve();
+    expect(app.connectionStatus.hidden).toBe(true);
+  });
+  it("coalesces pending syncs so the completed plan is delivered after an older intake acknowledgement", async () => {
+    const { payload } = await resultFixture();
+    const app = appHarness();
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: presentIntake(
+        intakeView(beginIntake({ origin: "Boston, MA" })),
+        "widget",
+      ),
+    });
+    const first = app.messages.find(
+      (message) => message.method === "ui/update-model-context",
+    )!;
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: payload,
+    });
+    expect(
+      app.messages.filter(
+        (message) => message.method === "ui/update-model-context",
+      ),
+    ).toHaveLength(1);
+    app.send({ jsonrpc: "2.0", id: first.id, result: {} });
+    await Promise.resolve();
+    const latest = app.messages
+      .filter((message) => message.method === "ui/update-model-context")
+      .at(-1)!;
+    expect(latest.id).not.toBe(first.id);
+    expect(JSON.stringify(latest.params)).toContain("plan_ready");
+    expect(JSON.stringify(latest.params)).not.toContain("intake_in_progress");
+  });
+  it("edits a confirmed answer through the existing tool without discarding the intake", async () => {
+    const intake = intakeView(beginIntake({ origin: "Boston, MA" }));
+    const app = appHarness();
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: presentIntake(intake, "widget"),
+    });
+    await app.root.querySelector(".answers")!.querySelector("button")!
+      .onclick!();
+    const input = app.root.querySelector("#edit-intake-answer")!;
+    input.value = "Seattle, WA";
+    const submitting = app.root.querySelector(".intake-edit")!.onsubmit!({
+      preventDefault() {},
+    });
+    const call = app.messages.find(
+      (message) => message.method === "tools/call",
+    )!;
+    expect(call.params).toMatchObject({
+      name: "answer_move_intake",
+      arguments: {
+        state: intake.state,
+        interactionMode: "widget",
+        changes: { origin: "Seattle, WA" },
+      },
+    });
+    app.send({
+      jsonrpc: "2.0",
+      id: call.id,
+      result: { isError: true, content: [{ text: "Try again" }] },
+    });
+    await submitting;
+    expect(input.value).toBe("Seattle, WA");
+    expect(app.root.text).toContain("Boston, MA");
+    expect(app.root.text).toContain("Try again");
+  });
+  it("keeps the next step prominent and opens the editor without rebuilding the plan", async () => {
+    const { payload } = await resultFixture();
+    const app = appHarness();
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: payload,
+    });
+    expect(app.root.querySelector(".next-action")!.text).toContain(
+      payload.structuredContent.readiness.nextAction,
+    );
+    const editor = app.root.querySelector(".editor-details")!;
+    expect(editor).not.toHaveProperty("open", true);
+    await app.root.querySelector(".plan-actions")!.querySelector("button")!
+      .onclick!();
+    expect(editor).toHaveProperty("open", true);
+    expect(
+      app.messages.some((message) => message.method === "tools/call"),
+    ).toBe(false);
+  });
   it.each(["slider", "amount"])(
     "refreshes housing and its map when the monthly rent %s changes",
     async (control) => {
@@ -821,7 +998,7 @@ describe("shipped app bridge", () => {
         estimates: { source: "user", transportation: 1234 },
       },
     });
-    expect(app.root.querySelector("button")!.disabled).toBe(true);
+    expect(app.root.querySelector(".apply")!.disabled).toBe(true);
     const { arguments: args } = call.params as unknown as {
       arguments: {
         changes: Record<string, unknown>;
@@ -842,9 +1019,14 @@ describe("shipped app bridge", () => {
     });
     await submitting;
     expect(app.messages.some((m) => m.method === "ui/message")).toBe(false);
-    const context = app.messages.find(
+    const initialContext = app.messages.find(
       (m) => m.method === "ui/update-model-context",
     )!;
+    app.send({ jsonrpc: "2.0", id: initialContext.id, result: {} });
+    await Promise.resolve();
+    const context = app.messages
+      .filter((m) => m.method === "ui/update-model-context")
+      .at(-1)!;
     expect(JSON.stringify(context.params)).toContain("1234");
     expect(app.root.querySelector("#cost-transportation")!.value).toBe("1234");
     expect(app.root.text).toContain("Plan updated ·");
@@ -935,11 +1117,19 @@ describe("shipped app bridge", () => {
       "answer_move_intake",
       "generate_move_plan",
     ]);
-    expect(calls[1].params.arguments).toEqual({ state });
+    expect(calls[1].params.arguments).toEqual({
+      state,
+      interactionMode: "widget",
+    });
     expect(app.root.querySelector("button")).toBeNull();
-    const context = app.messages.find(
+    const initialContext = app.messages.find(
       (message) => message.method === "ui/update-model-context",
     )!;
+    app.send({ jsonrpc: "2.0", id: initialContext.id, result: {} });
+    await Promise.resolve();
+    const context = app.messages
+      .filter((message) => message.method === "ui/update-model-context")
+      .at(-1)!;
     expect(JSON.stringify(context.params)).toContain("building_plan");
     app.send({ jsonrpc: "2.0", id: context.id, result: {} });
   });
@@ -976,9 +1166,14 @@ describe("shipped app bridge", () => {
     expect(app.root.text).toContain("DEMO 101");
     expect(app.root.text).toContain("Where this information comes from");
     expect(app.messages.map((m) => m.method)).not.toContain("ui/message");
-    const context = app.messages.find(
+    const buildingContext = app.messages.find(
       (message) => message.method === "ui/update-model-context",
     )!;
+    app.send({ jsonrpc: "2.0", id: buildingContext.id, result: {} });
+    await Promise.resolve();
+    const context = app.messages
+      .filter((message) => message.method === "ui/update-model-context")
+      .at(-1)!;
     expect(JSON.stringify(context.params)).toContain("plan_ready");
     expect(JSON.stringify(context.params)).toContain("Do not restart the quiz");
     app.send({ jsonrpc: "2.0", id: context.id, result: {} });

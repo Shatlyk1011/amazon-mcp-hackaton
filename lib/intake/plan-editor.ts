@@ -106,18 +106,17 @@ export const planEditorRenderer = String.raw`
       const changes={};
       Object.entries(controls).forEach(([key,input])=>{if(key==='budget'&&input.value.trim()==='')return;const value=['furniture','needsHousing'].includes(key)?input.value==='true':['transport','movingDate','otherNeeds'].includes(key)?input.value:number(input);const previous=fields[key]??(key==='transport'?plan.move.transport:key==='suitcases'?2*(plan.move.adults+plan.move.children):'');if(value!==previous)changes[key]=value;});
       const estimates={source:'user',includeSecurityDeposit:deposit.checked,housingFees:0,moving:0,temporaryAccommodation:0};Object.entries(expenses).forEach(([key,input])=>{estimates[key]=number(input);});
-      busy=true;apply.disabled=true;reset.disabled=true;group.disabled=true;preferences.disabled=true;apply.textContent='Updating…';status.textContent='Updating homes, costs, and your moving schedule…';root.querySelector('.error')?.remove();
+      busy=true;apply.disabled=true;reset.disabled=true;group.disabled=true;preferences.disabled=true;apply.textContent='Updating…';status.textContent=Object.keys(changes).some(key=>['maxRent','minBedrooms','needsHousing','pets'].includes(key))?'Searching rentals and refreshing your plan…':'Updating estimates and refreshing your plan…';root.querySelector('.error')?.remove();
       try{
-        const reply=await request('tools/call',{name:'update_move_plan',arguments:{state:plan.state,changes,estimates}});
+        const reply=await request('tools/call',{name:'update_move_plan',arguments:{state:plan.state,interactionMode:'widget',changes,estimates}});
         update(reply);
-        if(reply.structuredContent?.status==='ready'){
-          const latest=reply.structuredContent;
+        const latest=readResult(reply);
+        if(latest?.status==='ready'){
+          const details=root.querySelector('.editor-details');if(details)details.open=true;
           const latestStatus=root.querySelector('.status');
-          if(latestStatus)latestStatus.textContent='Plan updated · '+money(latest.budget.recommended)+' total · '+(latest.budget.remaining===null?'budget not provided':latest.budget.remaining<0?money(Math.abs(latest.budget.remaining))+' over budget':money(latest.budget.remaining)+' remaining');
-          // Keep future conversation context current without creating a chat turn.
-          request('ui/update-model-context',{content:[{type:'text',text:JSON.stringify({move:latest.move,budget:latest.budget,nextAction:latest.readiness.nextAction})}]}).catch(()=>{});
+          if(latestStatus)latestStatus.textContent='Plan updated · '+money(latest.budget.recommended)+' total · '+(latest.move.needsHousing?money(latest.move.maxRent)+'/month limit · '+latest.housing.totalMatches+' matching homes':'housing already arranged')+' · '+(latest.budget.remaining===null?'budget not provided':latest.budget.remaining<0?money(Math.abs(latest.budget.remaining))+' over budget':money(latest.budget.remaining)+' remaining');
         }
-      }catch(e){apply.disabled=false;reset.disabled=false;group.disabled=false;preferences.disabled=false;apply.textContent='Retry update';status.textContent='Your edits are still here.';showError(e?.message||'The plan could not be updated. Try again.');}
+      }catch(e){apply.disabled=false;reset.disabled=false;group.disabled=false;preferences.disabled=false;apply.textContent='Retry update';status.textContent='Your edits are still here.';showError(e?.message||'The plan could not be updated. Try again.',form);}
       finally{busy=false;resize();}
     };
     refresh();

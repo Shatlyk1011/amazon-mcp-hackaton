@@ -52,6 +52,56 @@ async function connectPublic() {
 }
 
 describe("relocation tool discovery metadata", () => {
+  it("validates confirmed-answer edits and preserves the rest of the caller-owned state", async () => {
+    const client = await connectPublic();
+    try {
+      const initial = beginIntake({
+        origin: "Boston, MA",
+        destination: "Austin, TX",
+        adults: 2,
+      });
+      const result = await client.callTool({
+        name: "answer_move_intake",
+        arguments: {
+          state: initial,
+          changes: { origin: "Seattle, WA" },
+          interactionMode: "widget",
+        },
+      });
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        state: {
+          fields: {
+            origin: "Seattle, WA",
+            destination: "Austin, TX",
+            adults: 2,
+          },
+          sources: { origin: "answer" },
+        },
+      });
+      expect(result._meta).toHaveProperty("moveflow.view.nextQuestion");
+      const invalid = await client.callTool({
+        name: "answer_move_intake",
+        arguments: {
+          state: initial,
+          changes: { adults: -1 },
+          interactionMode: "widget",
+        },
+      });
+      expect(invalid.isError).toBe(true);
+      const ambiguous = await client.callTool({
+        name: "answer_move_intake",
+        arguments: {
+          state: initial,
+          changes: { adults: 3 },
+          answer: { questionId: "household", text: "3" },
+        },
+      });
+      expect(ambiguous.isError).toBe(true);
+    } finally {
+      await client.close();
+    }
+  });
   it("describes natural relocation requests and excludes ordinary trips", async () => {
     const client = await connectPublic();
     try {
@@ -211,6 +261,7 @@ describe("public MCP standalone contracts", () => {
           },
           savedContext: { adults: 2, children: 2, pets: 1 },
           includeContext: true,
+          interactionMode: "conversation",
         },
       });
       const view = prepared.structuredContent as {
@@ -252,7 +303,7 @@ describe("public MCP standalone contracts", () => {
     try {
       const prepared = await client.callTool({
         name: "prepare_move_intake",
-        arguments: {},
+        arguments: { interactionMode: "conversation" },
       });
       const view = prepared.structuredContent as {
         state: { fields: Record<string, unknown> };
@@ -266,6 +317,7 @@ describe("public MCP standalone contracts", () => {
         name: "answer_move_intake",
         arguments: {
           state: view.state,
+          interactionMode: "conversation",
           answer: { questionId: "origin", text: "Boston, MA" },
         },
       });
@@ -286,7 +338,12 @@ describe("public MCP standalone contracts", () => {
       const known = { origin: "New York, NY", destination: "Texas" };
       const prepared = await client.callTool({
         name: "prepare_move_intake",
-        arguments: { known, savedContext: { pets: 2 }, includeContext: false },
+        arguments: {
+          known,
+          savedContext: { pets: 2 },
+          includeContext: false,
+          interactionMode: "conversation",
+        },
       });
       const view = prepared.structuredContent as {
         nextQuestion: { id: string };
@@ -298,7 +355,7 @@ describe("public MCP standalone contracts", () => {
       expect(view.state.fields.pets).toBeUndefined();
       const generated = await client.callTool({
         name: "generate_move_plan",
-        arguments: { state: view.state },
+        arguments: { state: view.state, interactionMode: "conversation" },
       });
       const result = JSON.parse(
         (generated.content as { type: string; text: string }[])[0].text,
@@ -317,11 +374,11 @@ describe("public MCP standalone contracts", () => {
         (tool) => tool.name === "prepare_move_intake",
       );
       expect(prepare?._meta?.ui).toEqual({
-        resourceUri: "ui://moveflow/quiz-v4.html",
+        resourceUri: "ui://moveflow/quiz-v5.html",
       });
       expect(prepare?.description).toContain("do not repeat its questions");
       const resource = await client.readResource({
-        uri: "ui://moveflow/quiz-v4.html",
+        uri: "ui://moveflow/quiz-v5.html",
       });
       expect(resource.contents[0]).toMatchObject({
         mimeType: "text/html;profile=mcp-app",
@@ -338,12 +395,18 @@ describe("public MCP standalone contracts", () => {
         arguments: { known: { origin: "Boston, MA" } },
       });
       expect((result.content as { text: string }[])[0].text).toBe(
-        "The MoveFlow interactive quiz is ready. Complete the questions in the widget.",
+        "Complete your move details in MoveFlow.",
       );
-      expect(
-        (result.structuredContent as { nextQuestion: { id: string } })
-          .nextQuestion.id,
-      ).toBe("destination");
+      expect(result.structuredContent).toMatchObject({
+        status: "intake_in_progress",
+        interaction: { mode: "widget", owner: "moveflow" },
+      });
+      expect(result.structuredContent).not.toHaveProperty("nextQuestion");
+      expect(result.structuredContent).not.toHaveProperty("questions");
+      expect(result._meta).toHaveProperty(
+        "moveflow.view.nextQuestion.id",
+        "destination",
+      );
     } finally {
       await client.close();
     }

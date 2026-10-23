@@ -12,16 +12,26 @@ import {
   buildInteractiveMaps,
   buildPlanMap,
   buildPlanPresentation,
-  movePlanText,
 } from "./plan-result";
+import {
+  interactionModeSchema,
+  presentIntake,
+  presentPlan,
+} from "./app-output";
 import { applyIntakeFields, completeIntake, intakeView } from "./engine";
 import {
   intakeAnswerSchema,
   intakeFieldsSchema,
   intakeStateSchema,
   type IntakeState,
+  type IntakeView,
 } from "./schema";
-import { continueIntake, getRentGuidance, prepareIntake } from "./service";
+import {
+  continueIntake,
+  enrichIntake,
+  getRentGuidance,
+  prepareIntake,
+} from "./service";
 import { quizHtml, quizResourceUri, resultResourceUri } from "./quiz-app";
 import { invalidateMovingEstimates } from "./estimate-expenses";
 
@@ -51,6 +61,7 @@ const planChangesSchema = intakeFieldsSchema.pick({
 async function generateMoveResult(
   state: IntakeState,
   estimates?: MovingEstimates,
+  interactionMode?: "widget" | "conversation",
 ) {
   try {
     const latest = intakeStateSchema.parse({
@@ -62,8 +73,7 @@ async function generateMoveResult(
           : (estimates ?? state.expenseEstimates),
     });
     const view = intakeView(latest);
-    if (!view.ready)
-      return output(async () => ({ status: "needs_input", ...view }));
+    if (!view.ready) return presentIntake(view, interactionMode);
     const result = await generatePlan(completeIntake(latest));
     latest.expenseEstimates = result.input.expenseEstimates;
     const plan = buildPlanPresentation(result, latest);
@@ -71,17 +81,11 @@ async function generateMoveResult(
       buildPlanMap(result),
       buildHousingMap(result),
     ]);
-    return {
-      content: [{ type: "text" as const, text: movePlanText(plan) }],
-      structuredContent: plan,
-      _meta: {
-        moveflow: {
-          map,
-          housingMap,
-          interactive: buildInteractiveMaps(result),
-        },
-      },
-    };
+    return presentPlan(plan, interactionMode, {
+      map,
+      housingMap,
+      interactive: buildInteractiveMaps(result),
+    });
   } catch (error) {
     return {
       isError: true,
@@ -96,6 +100,14 @@ async function generateMoveResult(
       ],
     };
   }
+}
+async function intakeOutput(
+  work: () => Promise<IntakeView>,
+  mode: "widget" | "conversation" | undefined,
+) {
+  const result = await output(work);
+  if (result.isError) return result;
+  return presentIntake(result.structuredContent as IntakeView, mode);
 }
 async function output(work: () => Promise<unknown>, text?: string) {
   try {
@@ -151,6 +163,7 @@ export function registerIntakeTools(server: McpServer) {
                   ? "MoveFlow displays an interactive quiz that presents the current question and options, collects each answer, advances the intake, and builds the moving plan. Do not repeat the question, options, or summary outside the widget."
                   : "MoveFlow renders an editable moving plan: maps, housing, estimated expenses, preferences, timeline, and sources. The Update plan button refreshes this app in place without posting a chat message.",
               ui: {
+                prefersBorder: true,
                 csp: {
                   connectDomains: [],
                   resourceDomains: ["https://api.mapbox.com"],
@@ -166,9 +179,10 @@ export function registerIntakeTools(server: McpServer) {
     "prepare_move_intake",
     {
       description:
-        "Use this when someone wants help planning a move or relocation between US cities, such as “I’m moving from Boston to Austin” or “help me relocate to Denver.” Start an interactive moving-plan intake even if they do not mention MoveFlow. Include their actual words in prompt and put details explicitly stated in the current request in known. Also check available earlier conversation, user profile, or memory for relevant facts the user has provided, such as numbers of adults, children and pets, housing needs, accessibility and work preferences. Put applicable, sufficiently certain facts in savedContext and set includeContext to true so they can inform the move and avoid repeated questions. Send only relevant details the user intends to use for this move; do not send the full conversation or profile. Current request details override savedContext. Omit unknown, uncertain, outdated or conflicting facts; never invent or assume answers, including a breakdown of household members from a total alone. Do not use for a simple trip or flight search without a relocation request. If extractionWarning is returned, tell the user and review missing details. Do not answer questions or select options on the user’s behalf. When the interactive widget is available, let it conduct the intake and build the plan; do not repeat its questions, options, or summary, create another quiz, or call answer_move_intake or generate_move_plan on its behalf. Respond only with a brief direction to use the MoveFlow widget. If the widget is unavailable or the user asks to continue in conversation, ask the returned question and wait for their answer before calling answer_move_intake; when ready is true, call generate_move_plan without another confirmation. Returns ready, nextQuestion, summary and caller-owned state. The server only uses context supplied in this call; it does not read the host’s conversation, browser sessions, profile or memory, and does not save data.",
+        "Use this when someone wants help planning a move or relocation between US cities, such as “I’m moving from Boston to Austin” or “help me relocate to Denver.” Start an interactive moving-plan intake even if they do not mention MoveFlow. Include their actual words in prompt and put details explicitly stated in the current request in known. Also check available earlier conversation, user profile, or memory for relevant facts the user has provided, such as numbers of adults, children and pets, housing needs, accessibility and work preferences. Put applicable, sufficiently certain facts in savedContext and set includeContext to true so they can inform the move and avoid repeated questions. Send only relevant details the user intends to use for this move; do not send the full conversation or profile. Current request details override savedContext. Omit unknown, uncertain, outdated or conflicting facts; never invent or assume answers, including a breakdown of household members from a total alone. Do not use for a simple trip or flight search without a relocation request. If extractionWarning is returned, briefly mention it; let the widget review the details. Do not answer questions or select options on the user’s behalf. When the interactive widget is available, let it conduct the intake and build the plan; do not repeat its questions, options, or summary, create another quiz, or call answer_move_intake or generate_move_plan on its behalf. Respond only with a brief direction to use the MoveFlow widget. If the widget is unavailable or the user asks to continue in conversation, set interactionMode to conversation, ask only the returned nextQuestion and wait for their answer before calling answer_move_intake; when ready is true, call generate_move_plan without another confirmation. Widget mode returns confirmed state and progress; the questions are delivered only to the widget. Never infer that the widget failed just because no answer appears in chat. The server only uses context supplied in this call; it does not read the host’s conversation, browser sessions, profile or memory, and does not save data.",
       _meta: { ui: { resourceUri: quizResourceUri } },
       inputSchema: z.object({
+        interactionMode: interactionModeSchema.default("widget"),
         prompt: z
           .string()
           .trim()
@@ -197,28 +211,46 @@ export function registerIntakeTools(server: McpServer) {
       annotations,
     },
     (args) =>
-      output(
+      intakeOutput(
         () =>
           prepareIntake(
             args.prompt,
             args.known,
             args.includeContext ? args.savedContext : {},
           ),
-        "The MoveFlow interactive quiz is ready. Complete the questions in the widget.",
+        args.interactionMode,
       ),
   );
   server.registerTool(
     "answer_move_intake",
     {
       description:
-        "Record the user’s explicit answer to the current intake question using its choice ID, a free-text answer, or optional monthlyIncome for the rent question. Never choose or invent an answer for the user. Pass the latest state returned by prepare_move_intake or this tool. Uses the same validation and missing-information rules as the browser quiz. Income itself is not retained, only the user-selected 30% rent ceiling. Returns the next question or ready=true. When ready is true, immediately call generate_move_plan without asking for another confirmation. Does not persist data.",
-      inputSchema: z.object({
-        state: intakeStateSchema,
-        answer: intakeAnswerSchema,
-      }),
+        "Record the user’s explicit answer in MoveFlow. The widget calls this tool during interactive intake; do not call it to conduct a parallel chat interview. For an explicitly requested conversation fallback, set interactionMode to conversation, ask only the returned nextQuestion, and wait for the user’s answer. Pass the latest returned state. Never choose answers for the user. In conversation mode, call generate_move_plan when ready is true. Income itself is not retained, only the user-selected 30% rent ceiling. Does not persist data.",
+      inputSchema: z
+        .object({
+          interactionMode: interactionModeSchema.optional(),
+          state: intakeStateSchema,
+          answer: intakeAnswerSchema.optional(),
+          changes: intakeFieldsSchema
+            .optional()
+            .describe(
+              "Explicit edits to confirmed answers in the widget. Supply either changes or answer, never both.",
+            ),
+        })
+        .refine(
+          (args) => Boolean(args.answer) !== Boolean(args.changes),
+          "Supply either an answer or changes.",
+        ),
       annotations,
     },
-    (args) => output(() => continueIntake(args.state, args.answer)),
+    (args) =>
+      intakeOutput(
+        () =>
+          args.changes
+            ? enrichIntake(applyIntakeFields(args.state, args.changes))
+            : continueIntake(args.state, args.answer!),
+        args.interactionMode,
+      ),
   );
   server.registerTool(
     "get_relocation_rent_guidance",
@@ -242,32 +274,35 @@ export function registerIntakeTools(server: McpServer) {
     "generate_move_plan",
     {
       description:
-        "Generate and display the editable MoveFlow moving plan from explicit intake state. Missing expense and strategy estimates are generated with OpenAI using the move details. These are planning estimates, not live quotes or verified market averages. Never invent user facts or overwrite applied user costs. If essential context is missing, returns needs_input and the next question. Stateless; no database or plan ID required.",
+        "Generate and display the editable MoveFlow moving plan from explicit intake state. The widget calls this after intake; do not generate a parallel plan while it is collecting answers. Set interactionMode to widget to display a plan, or conversation for an explicitly requested chat fallback. Omitting the mode preserves the full legacy response. Missing expense and strategy estimates are generated with OpenAI using the move details. These are planning estimates, not live quotes or verified market averages. Never invent user facts or overwrite applied user costs. If essential context is missing, returns needs_input and the next question. Stateless; no database or plan ID required.",
       _meta: {
         ui: { resourceUri: resultResourceUri, visibility: ["model", "app"] },
       },
       inputSchema: z.object({
         state: intakeStateSchema,
+        interactionMode: interactionModeSchema.optional(),
         estimates: movingEstimatesSchema.optional(),
       }),
       annotations,
     },
-    ({ state, estimates }) => generateMoveResult(state, estimates),
+    ({ state, estimates, interactionMode }) =>
+      generateMoveResult(state, estimates, interactionMode),
   );
   server.registerTool(
     "update_move_plan",
     {
       description:
-        "Apply the user's explicit expense or preference edits to the latest caller-owned state and regenerate the relocation plan, including housing searches, budget, readiness and timeline. Pass only changed preferences in changes. Estimates are editable planning allowances, not quotes. User edits take precedence over GPT defaults. Returns the latest state in structuredContent.state for subsequent updates. Does not persist or book anything.",
+        "Apply the user's explicit expense or preference edits to the latest caller-owned state and regenerate the relocation plan, including housing searches, budget, readiness and timeline. Use interactionMode widget for updates in the app; conversation is an explicit chat fallback. Omitting the mode preserves the full legacy response. Pass only changed preferences in changes. Estimates are editable planning allowances, not quotes. User edits take precedence over GPT defaults. Returns the latest state in structuredContent.state for subsequent updates. Does not persist or book anything.",
       _meta: { ui: { visibility: ["model", "app"] } },
       inputSchema: z.object({
         state: intakeStateSchema,
+        interactionMode: interactionModeSchema.optional(),
         changes: planChangesSchema.default({}),
         estimates: movingEstimatesSchema.optional(),
       }),
       annotations,
     },
-    ({ state, changes, estimates }) => {
+    ({ state, changes, estimates, interactionMode }) => {
       const latest = applyIntakeFields(state, {
         ...changes,
         ...(changes.pets !== undefined
@@ -285,7 +320,7 @@ export function registerIntakeTools(server: McpServer) {
           ...estimates,
           source: "user",
         };
-      return generateMoveResult(latest);
+      return generateMoveResult(latest, undefined, interactionMode);
     },
   );
 }
