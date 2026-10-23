@@ -497,6 +497,12 @@ describe("MoveFlow final result", () => {
       expect(legacy.structuredContent).toHaveProperty("timeline");
       expect(legacy.structuredContent).toHaveProperty("readiness");
       expect(legacy.structuredContent).not.toHaveProperty("interaction");
+      const restored = await client.callTool({
+        name: "get_moveflow_view",
+        arguments: { state },
+      });
+      expect(restored.structuredContent).toHaveProperty("timeline");
+      expect(restored.structuredContent).toHaveProperty("readiness");
       vi.mocked(calculateMapboxRoute).mockRejectedValueOnce(
         new Error("provider failure"),
       );
@@ -560,7 +566,7 @@ class TestNode {
     return this.textContent + this.children.map((n) => n.text).join(" ");
   }
 }
-function appHarness() {
+function appHarness(hostMetadata?: Record<string, unknown>) {
   const root = new TestNode();
   const connectionStatus = new TestNode();
   let height = 600;
@@ -593,6 +599,7 @@ function appHarness() {
       observe() {}
     },
     window: {
+      openai: { toolResponseMetadata: hostMetadata },
       addEventListener: (type: string, handler: typeof listener) => {
         if (type === "message") listener = handler;
       },
@@ -613,6 +620,191 @@ function appHarness() {
 }
 
 describe("shipped app bridge", () => {
+  it.each(["call_tool_result", "mcp_tool_result"])(
+    "reads widget data from the host's %s envelope",
+    (key) => {
+      const intake = intakeView(
+        beginIntake({ origin: "New York, NY", destination: "Dallas, TX" }),
+      );
+      const payload = presentIntake(intake, "widget");
+      const app = appHarness({ [key]: payload });
+      app.send({
+        jsonrpc: "2.0",
+        method: "ui/notifications/tool-result",
+        params: { structuredContent: payload.structuredContent },
+      });
+      expect(app.root.text).toContain(intake.nextQuestion!.title);
+      expect(app.root.querySelector("form")).not.toBeNull();
+      expect(
+        app.messages.some((message) => message.method === "tools/call"),
+      ).toBe(false);
+    },
+  );
+  it("does not use stale host metadata after the confirmed state changes", () => {
+    const previous = presentIntake(
+      intakeView(beginIntake({ origin: "Boston, MA" })),
+      "widget",
+    );
+    const latest = presentIntake(
+      intakeView(
+        beginIntake({ origin: "New York, NY", destination: "Dallas, TX" }),
+      ),
+      "widget",
+    );
+    const app = appHarness({ call_tool_result: previous });
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: { structuredContent: latest.structuredContent },
+    });
+    const recovery = app.messages.find(
+      (message) => message.method === "tools/call",
+    )!;
+    expect(recovery?.params).toMatchObject({
+      name: "get_moveflow_view",
+      arguments: { state: latest.structuredContent.state },
+    });
+    expect(app.root.text).not.toContain("Boston, MA");
+  });
+  it("offers a bounded retry when restoring a questionnaire fails", async () => {
+    const intake = intakeView(
+      beginIntake({ origin: "New York, NY", destination: "Dallas, TX" }),
+    );
+    const payload = presentIntake(intake, "widget");
+    const app = appHarness();
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: { structuredContent: payload.structuredContent },
+    });
+    const first = app.messages.find(
+      (message) => message.method === "tools/call",
+    )!;
+    app.send({
+      jsonrpc: "2.0",
+      id: first.id,
+      result: { isError: true, content: [{ text: "Connection interrupted" }] },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await vi.waitFor(() =>
+      expect(app.root.text).toContain("Your confirmed answers are kept"),
+    );
+    expect(
+      app.messages.filter((message) => message.method === "tools/call"),
+    ).toHaveLength(1);
+    const retrying = app.root.querySelector("button")!.onclick!();
+    const retry = app.messages
+      .filter((message) => message.method === "tools/call")
+      .at(-1)!;
+    expect(retry.params).toEqual(first.params);
+    app.send({
+      jsonrpc: "2.0",
+      id: retry.id,
+      result: { structuredContent: intake },
+    });
+    await retrying;
+    expect(app.root.text).toContain(intake.nextQuestion!.title);
+  });
+  it("coalesces duplicate recovery requests and ignores a late result after newer answers arrive", async () => {
+    const original = intakeView(
+      beginIntake({ origin: "New York, NY", destination: "Dallas, TX" }),
+    );
+    const payload = presentIntake(original, "widget");
+    const app = appHarness();
+    for (let i = 0; i < 2; i++)
+      app.send({
+        jsonrpc: "2.0",
+        method: "ui/notifications/tool-result",
+        params: { structuredContent: payload.structuredContent },
+      });
+    const loads = app.messages.filter(
+      (message) => message.method === "tools/call",
+    );
+    expect(loads).toHaveLength(1);
+    const latest = intakeView(
+      beginIntake({ origin: "New York, NY", destination: "Austin, TX" }),
+    );
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: presentIntake(latest, "widget"),
+    });
+    app.send({
+      jsonrpc: "2.0",
+      id: loads[0].id,
+      result: { structuredContent: original },
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(app.root.text).toContain("Austin, TX");
+    expect(app.root.text).not.toContain("Dallas, TX");
+  });
+  it("restores a completed plan when its private presentation is missing", async () => {
+    const { result, payload } = await resultFixture();
+    const compact = presentPlan(payload.structuredContent, "widget", {});
+    const app = appHarness();
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: { structuredContent: compact.structuredContent },
+    });
+    const recovery = app.messages.find(
+      (message) => message.method === "tools/call",
+    )!;
+    expect(recovery.params).toMatchObject({
+      name: "get_moveflow_view",
+      arguments: { state },
+    });
+    app.send({
+      jsonrpc: "2.0",
+      id: recovery.id,
+      result: { structuredContent: buildPlanPresentation(result, state) },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    await vi.waitFor(() =>
+      expect(app.root.querySelector(".next-action")).not.toBeNull(),
+    );
+    expect(app.root.text).toContain("Homes to compare");
+    expect(
+      app.messages.filter((message) => message.method === "tools/call"),
+    ).toHaveLength(1);
+  });
+  it("loads the questionnaire from its confirmed state when the host omits widget metadata", async () => {
+    const intake = intakeView(
+      beginIntake({ origin: "New York, NY", destination: "Dallas, TX" }),
+    );
+    const payload = presentIntake(intake, "widget");
+    const app = appHarness();
+    app.send({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: { structuredContent: payload.structuredContent },
+    });
+    const recovery = app.messages.find(
+      (message) => message.method === "tools/call",
+    )!;
+    expect(recovery?.params).toEqual({
+      name: "get_moveflow_view",
+      arguments: { state: intake.state },
+    });
+    expect(app.root.text).not.toContain("No question is available");
+    app.send({
+      jsonrpc: "2.0",
+      id: recovery.id,
+      result: { structuredContent: intake },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    await vi.waitFor(() =>
+      expect(app.root.text).toContain(intake.nextQuestion!.title),
+    );
+    expect(app.root.querySelector("form")).not.toBeNull();
+    expect(
+      app.messages.filter((message) => message.method === "tools/call"),
+    ).toHaveLength(1);
+  });
   it("renders widget-only data while keeping the questionnaire out of model context", () => {
     const intake = intakeView(beginIntake({ origin: "Boston, MA" }));
     const payload = presentIntake(intake, "widget");
@@ -1198,6 +1390,7 @@ describe("shipped app bridge", () => {
       id: request.id,
       result: { isError: true, content: [{ text: "Provider unavailable" }] },
     });
+    await Promise.resolve();
     await Promise.resolve();
     const button = app.root.querySelector("button")!;
     expect(button.textContent).toContain("Retry");

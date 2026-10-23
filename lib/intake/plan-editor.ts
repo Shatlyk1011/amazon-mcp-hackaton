@@ -109,8 +109,7 @@ export const planEditorRenderer = String.raw`
       busy=true;apply.disabled=true;reset.disabled=true;group.disabled=true;preferences.disabled=true;apply.textContent='Updating…';status.textContent=Object.keys(changes).some(key=>['maxRent','minBedrooms','needsHousing','pets'].includes(key))?'Searching rentals and refreshing your plan…':'Updating estimates and refreshing your plan…';root.querySelector('.error')?.remove();
       try{
         const reply=await request('tools/call',{name:'update_move_plan',arguments:{state:plan.state,interactionMode:'widget',changes,estimates}});
-        update(reply);
-        const latest=readResult(reply);
+        const latest=await update(reply);
         if(latest?.status==='ready'){
           const details=root.querySelector('.editor-details');if(details)details.open=true;
           const latestStatus=root.querySelector('.status');

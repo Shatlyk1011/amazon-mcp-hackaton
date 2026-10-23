@@ -1,8 +1,8 @@
 import { resultRenderer, resultStyles } from "./result-app";
 import { planEditorRenderer, planEditorStyles } from "./plan-editor";
 
-export const quizResourceUri = "ui://moveflow/quiz-v5.html";
-export const resultResourceUri = "ui://moveflow/plan-v4.html";
+export const quizResourceUri = "ui://moveflow/quiz-v6.html";
+export const resultResourceUri = "ui://moveflow/plan-v5.html";
 
 // A self-contained resource lets MCP Apps hosts render it without fetching assets.
 export const quizHtml = String.raw`<!doctype html>
@@ -22,6 +22,8 @@ ${planEditorStyles}
   let latestContext, syncing = false, contextRevision = 0;
   const mapDisposers = [];
   const pending = new Map();
+  const viewLoads = new Map();
+  let resultRevision = 0;
   const notify = (method, params) => parent.postMessage({jsonrpc:'2.0',method,params}, '*');
   const request = (method, params) => new Promise((resolve,reject) => {
     const id = ++nextId;
@@ -42,7 +44,20 @@ ${planEditorStyles}
   function showError(message, parent=root) { let el=parent.querySelector('.error'); if(!el){el=element('p','','error');el.setAttribute('role','alert');parent.append(el)} el.textContent=message; resize(); }
 ${planEditorRenderer}
 ${resultRenderer}
-  function readResult(result) { return result?._meta?.moveflow?.view ?? result?.structuredContent; }
+  function resultEnvelope(result) {
+    const data=result?.structuredContent;
+    const metadata=window.openai?.toolResponseMetadata;
+    const candidates=[result,result?.call_tool_result,result?.mcp_tool_result,metadata?.call_tool_result,metadata?.mcp_tool_result,metadata];
+    // Global host metadata may still describe the initial result after an edit.
+    const current=candidate=>!data?.state||(JSON.stringify(candidate?._meta?.moveflow?.view?.state)===JSON.stringify(data.state)&&(!data.generatedAt||candidate._meta.moveflow.view.generatedAt===data.generatedAt));
+    return candidates.find(candidate=>candidate?._meta?.moveflow?.view&&current(candidate))??candidates.find(candidate=>candidate?.structuredContent)??result;
+  }
+  function readResult(result) { const envelope=resultEnvelope(result);return envelope?._meta?.moveflow?.view ?? envelope?.structuredContent; }
+  function restoreView(state) {
+    const key=JSON.stringify(state);
+    if(!viewLoads.has(key))viewLoads.set(key,request('tools/call',{name:'get_moveflow_view',arguments:{state}}).finally(()=>viewLoads.delete(key)));
+    return viewLoads.get(key);
+  }
   function disposeMaps() { mapDisposers.splice(0).forEach(dispose=>dispose()); }
   function contextStatus(failed) {
     const status=document.getElementById('connection-status');
@@ -73,7 +88,8 @@ ${resultRenderer}
   function syncPlan(plan) {
     syncContext({status:'plan_ready',state:plan.state,move:plan.move,budget:plan.budget,housing:plan.housing,nextAction:plan.readiness?.nextAction,instruction:'The MoveFlow widget has completed the intake and displays the plan. Do not restart the quiz or repeat its questions. Answer follow-ups using these confirmed details.'});
   }
-  function update(result) {
+  async function update(result, allowRecovery=true) {
+    const revision=allowRecovery?++resultRevision:resultRevision;
     if(result && result.isError) { const error=new Error(result.content?.[0]?.text || 'Could not save your answer.'); error.toolMessage=true; throw error; }
     const data=readResult(result);
     if(data?.interaction?.mode==='conversation'){
@@ -81,20 +97,32 @@ ${resultRenderer}
     }
     if(data?.status==='ready'&&data.readiness){
       const plan=data;
-      renderPlan(plan,result._meta?.moveflow);
+      renderPlan(plan,resultEnvelope(result)?._meta?.moveflow);
       syncPlan(plan);
-      return;
+      return plan;
     }
-    if(!data?.state||typeof data.ready!=='boolean'||(!data.ready&&!data.nextQuestion)) throw new Error('MoveFlow could not load its questions. Ask to continue in chat if reopening the widget does not help.');
+    if(data?.state&&(data.status==='ready'||typeof data.ready!=='boolean'||(!data.ready&&!data.nextQuestion))){
+      if(!allowRecovery)throw new Error('MoveFlow could not load its details. Your confirmed answers are still available.');
+      disposeMaps();root.replaceChildren(element('h1','Loading your move details…'));
+      resize();
+      try{const restored=await restoreView(data.state);if(revision!==resultRevision)return;return await update(restored,false)}
+      catch(error){
+        if(revision!==resultRevision)return;
+        root.replaceChildren(element('h1','Your move details could not load'),element('p','Your confirmed answers are kept. Retry to continue this move.'));
+        const retry=element('button','Retry loading MoveFlow');retry.type='button';retry.onclick=()=>update(result).catch(error=>showError(error.message));root.append(retry);showError(error?.message||'The connection failed. Please retry.');throw error;
+      }
+    }
+    if(!data?.state||typeof data.ready!=='boolean') throw new Error('MoveFlow could not load its questions. Ask to continue in chat if reopening the widget does not help.');
     view=data; buildError=undefined; render();
     syncContext({status:view.ready?'building_plan':'intake_in_progress',state:view.state,remainingQuestions:view.remainingQuestions,instruction:'The MoveFlow widget handles the intake. Do not ask its questions in chat or start a second quiz.'});
     if(view.ready) void buildPlan();
+    return data;
   }
   async function buildPlan() {
     if(building)return;
     building=true; buildError=undefined; render();
     try {
-      update(await request('tools/call',{name:'generate_move_plan',arguments:{state:view.state,interactionMode:'widget'}}));
+      await update(await request('tools/call',{name:'generate_move_plan',arguments:{state:view.state,interactionMode:'widget'}}));
     } catch(e) {
       buildError=e?.toolMessage ? e.message : 'The plan could not be built. Your answers are still here; please try again.';
       render();
@@ -132,7 +160,7 @@ ${resultRenderer}
     group.addEventListener('change',()=>{input.value=''});
     form.onsubmit=async event=>{event.preventDefault();if(busy)return;const choice=form.querySelector('input[name=choice]:checked');const text=input.value.trim();if(!choice&&!text){showError('Choose an option or enter an answer.');return;}
       busy=true;button.disabled=true;input.disabled=true;group.disabled=true;button.textContent='Saving…';root.querySelector('.error')?.remove();
-      try { const response=await request('tools/call',{name:'answer_move_intake',arguments:{state:view.state,interactionMode:'widget',answer:{questionId:q.id,...(choice?{choice:choice.value}:{text})}}}); update(response); }
+      try { const response=await request('tools/call',{name:'answer_move_intake',arguments:{state:view.state,interactionMode:'widget',answer:{questionId:q.id,...(choice?{choice:choice.value}:{text})}}}); await update(response); }
       catch(e){showError(e?.message || 'Could not save your answer. Try again.',form);button.disabled=false;input.disabled=false;group.disabled=false;button.textContent='Continue';} finally{busy=false;}
     };
     renderAnsweredDetails(view,root);
@@ -163,14 +191,14 @@ ${resultRenderer}
       event.preventDefault();
       const text=input.value.trim();if(!text||busy)return;
       const value=input.type==='number'?Number(text):text;busy=true;apply.disabled=true;input.disabled=true;select.disabled=true;root.querySelector('.error')?.remove();
-      try{update(await request('tools/call',{name:'answer_move_intake',arguments:{state:data.state,interactionMode:'widget',changes:{[select.value]:value}}}))}catch(e){showError(e?.message||'The answer could not be updated.',panel);apply.disabled=false;input.disabled=false;select.disabled=false}finally{busy=false}
+      try{await update(await request('tools/call',{name:'answer_move_intake',arguments:{state:data.state,interactionMode:'widget',changes:{[select.value]:value}}}))}catch(e){showError(e?.message||'The answer could not be updated.',panel);apply.disabled=false;input.disabled=false;select.disabled=false}finally{busy=false}
     };
     panel.append(label,select,input,apply);root.querySelector('.intake-edit')?.remove();root.append(panel);resize();
   }
   window.addEventListener('message',event=>{if(event.source!==parent)return;const m=event.data;if(!m||m.jsonrpc!=='2.0')return;
     if(typeof m.id==='number'&&pending.has(m.id)){const p=pending.get(m.id);clearTimeout(p.timer);pending.delete(m.id);m.error?p.reject(m.error):p.resolve(m.result);return;}
-    if(m.method==='ui/notifications/tool-result'){try{update(m.params)}catch(e){showError(e.message)}}
+    if(m.method==='ui/notifications/tool-result')void update(m.params).catch(e=>showError(e.message));
   });
-  request('ui/initialize',{appInfo:{name:'MoveFlow',version:'2.0.0'},appCapabilities:{},protocolVersion:'2026-01-26'}).then(()=>notify('ui/notifications/initialized',{})).catch(()=>showError('The quiz could not connect. Continue in the conversation.'));
+  request('ui/initialize',{appInfo:{name:'MoveFlow',version:'2.1.1'},appCapabilities:{},protocolVersion:'2026-01-26'}).then(()=>notify('ui/notifications/initialized',{})).catch(()=>showError('The quiz could not connect. Continue in the conversation.'));
 })();
 </script></body></html>`;

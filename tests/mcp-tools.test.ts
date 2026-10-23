@@ -128,6 +128,12 @@ const standaloneCalls: {
   arguments: Record<string, unknown>;
 }[] = [
   {
+    name: "get_moveflow_view",
+    arguments: {
+      state: beginIntake({ origin: "New York, NY", destination: "Dallas, TX" }),
+    },
+  },
+  {
     name: "prepare_move_intake",
     arguments: { known: { origin: "New York, NY", destination: "Texas" } },
   },
@@ -374,11 +380,11 @@ describe("public MCP standalone contracts", () => {
         (tool) => tool.name === "prepare_move_intake",
       );
       expect(prepare?._meta?.ui).toEqual({
-        resourceUri: "ui://moveflow/quiz-v5.html",
+        resourceUri: "ui://moveflow/quiz-v6.html",
       });
       expect(prepare?.description).toContain("do not repeat its questions");
       const resource = await client.readResource({
-        uri: "ui://moveflow/quiz-v5.html",
+        uri: "ui://moveflow/quiz-v6.html",
       });
       expect(resource.contents[0]).toMatchObject({
         mimeType: "text/html;profile=mcp-app",
@@ -407,6 +413,25 @@ describe("public MCP standalone contracts", () => {
         "moveflow.view.nextQuestion.id",
         "destination",
       );
+      expect(prepare?._meta?.["openai/outputTemplate"]).toBe(
+        "ui://moveflow/quiz-v6.html",
+      );
+      const recovery = tools.tools.find(
+        (tool) => tool.name === "get_moveflow_view",
+      );
+      expect(recovery?._meta?.ui).toEqual({ visibility: ["app"] });
+      for (const uri of [
+        "ui://moveflow/quiz-v5.html",
+        "ui://moveflow/quiz-v4.html",
+        "ui://moveflow/plan-v4.html",
+        "ui://moveflow/plan-v3.html",
+      ]) {
+        const legacyResource = await client.readResource({ uri });
+        expect(legacyResource.contents[0]).toHaveProperty(
+          "text",
+          expect.stringContaining("get_moveflow_view"),
+        );
+      }
     } finally {
       await client.close();
     }

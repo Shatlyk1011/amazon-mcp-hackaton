@@ -140,15 +140,23 @@ async function output(work: () => Promise<unknown>, text?: string) {
 // Public tools are stateless: the caller owns the explicit state snapshot.
 // Browser sessions persist this same snapshot in the owner-scoped intake table.
 export function registerIntakeTools(server: McpServer) {
-  for (const resourceUri of [quizResourceUri, resultResourceUri]) {
+  const quizUris = [
+    quizResourceUri,
+    "ui://moveflow/quiz-v5.html",
+    "ui://moveflow/quiz-v4.html",
+  ];
+  const planUris = [
+    resultResourceUri,
+    "ui://moveflow/plan-v4.html",
+    "ui://moveflow/plan-v3.html",
+  ];
+  for (const resourceUri of [...quizUris, ...planUris]) {
+    const isQuiz = quizUris.includes(resourceUri);
     server.registerResource(
-      resourceUri === quizResourceUri ? "move-quiz" : "move-plan",
+      `moveflow-${resourceUri.split("/").at(-1)}`,
       resourceUri,
       {
-        title:
-          resourceUri === quizResourceUri
-            ? "Move setup quiz"
-            : "Your moving plan",
+        title: isQuiz ? "Move setup quiz" : "Your moving plan",
         mimeType: "text/html;profile=mcp-app",
       },
       async (uri) => ({
@@ -158,10 +166,9 @@ export function registerIntakeTools(server: McpServer) {
             mimeType: "text/html;profile=mcp-app",
             text: quizHtml,
             _meta: {
-              "openai/widgetDescription":
-                resourceUri === quizResourceUri
-                  ? "MoveFlow displays an interactive quiz that presents the current question and options, collects each answer, advances the intake, and builds the moving plan. Do not repeat the question, options, or summary outside the widget."
-                  : "MoveFlow renders an editable moving plan: maps, housing, estimated expenses, preferences, timeline, and sources. The Update plan button refreshes this app in place without posting a chat message.",
+              "openai/widgetDescription": isQuiz
+                ? "MoveFlow displays an interactive quiz that presents the current question and options, collects each answer, advances the intake, and builds the moving plan. Do not repeat the question, options, or summary outside the widget."
+                : "MoveFlow renders an editable moving plan: maps, housing, estimated expenses, preferences, timeline, and sources. The Update plan button refreshes this app in place without posting a chat message.",
               ui: {
                 prefersBorder: true,
                 csp: {
@@ -180,7 +187,11 @@ export function registerIntakeTools(server: McpServer) {
     {
       description:
         "Use this when someone wants help planning a move or relocation between US cities, such as “I’m moving from Boston to Austin” or “help me relocate to Denver.” Start an interactive moving-plan intake even if they do not mention MoveFlow. Include their actual words in prompt and put details explicitly stated in the current request in known. Also check available earlier conversation, user profile, or memory for relevant facts the user has provided, such as numbers of adults, children and pets, housing needs, accessibility and work preferences. Put applicable, sufficiently certain facts in savedContext and set includeContext to true so they can inform the move and avoid repeated questions. Send only relevant details the user intends to use for this move; do not send the full conversation or profile. Current request details override savedContext. Omit unknown, uncertain, outdated or conflicting facts; never invent or assume answers, including a breakdown of household members from a total alone. Do not use for a simple trip or flight search without a relocation request. If extractionWarning is returned, briefly mention it; let the widget review the details. Do not answer questions or select options on the user’s behalf. When the interactive widget is available, let it conduct the intake and build the plan; do not repeat its questions, options, or summary, create another quiz, or call answer_move_intake or generate_move_plan on its behalf. Respond only with a brief direction to use the MoveFlow widget. If the widget is unavailable or the user asks to continue in conversation, set interactionMode to conversation, ask only the returned nextQuestion and wait for their answer before calling answer_move_intake; when ready is true, call generate_move_plan without another confirmation. Widget mode returns confirmed state and progress; the questions are delivered only to the widget. Never infer that the widget failed just because no answer appears in chat. The server only uses context supplied in this call; it does not read the host’s conversation, browser sessions, profile or memory, and does not save data.",
-      _meta: { ui: { resourceUri: quizResourceUri } },
+      _meta: {
+        ui: { resourceUri: quizResourceUri },
+        "openai/outputTemplate": quizResourceUri,
+        "openai/widgetAccessible": true,
+      },
       inputSchema: z.object({
         interactionMode: interactionModeSchema.default("widget"),
         prompt: z
@@ -220,6 +231,20 @@ export function registerIntakeTools(server: McpServer) {
           ),
         args.interactionMode,
       ),
+  );
+  server.registerTool(
+    "get_moveflow_view",
+    {
+      description:
+        "Restore the complete MoveFlow widget from its latest caller-owned state when host rendering metadata is unavailable. Returns the current intake question, or rebuilds the ready plan through the existing planner. Does not change answers or persist anything.",
+      _meta: { ui: { visibility: ["app"] } },
+      inputSchema: z.object({ state: intakeStateSchema }),
+      annotations,
+    },
+    ({ state }) => {
+      const view = intakeView(state);
+      return view.ready ? generateMoveResult(state) : output(async () => view);
+    },
   );
   server.registerTool(
     "answer_move_intake",
@@ -277,6 +302,8 @@ export function registerIntakeTools(server: McpServer) {
         "Generate and display the editable MoveFlow moving plan from explicit intake state. The widget calls this after intake; do not generate a parallel plan while it is collecting answers. Set interactionMode to widget to display a plan, or conversation for an explicitly requested chat fallback. Omitting the mode preserves the full legacy response. Missing expense and strategy estimates are generated with OpenAI using the move details. These are planning estimates, not live quotes or verified market averages. Never invent user facts or overwrite applied user costs. If essential context is missing, returns needs_input and the next question. Stateless; no database or plan ID required.",
       _meta: {
         ui: { resourceUri: resultResourceUri, visibility: ["model", "app"] },
+        "openai/outputTemplate": resultResourceUri,
+        "openai/widgetAccessible": true,
       },
       inputSchema: z.object({
         state: intakeStateSchema,
